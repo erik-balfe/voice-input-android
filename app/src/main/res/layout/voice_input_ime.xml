@@ -2,28 +2,67 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="center"
+    android:background="@color/ime_background"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:paddingTop="12dp"
+    android:paddingBottom="16dp">
 
     <TextView
         android:id="@+id/status"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:text="@string/ime_hold_to_speak"
-        android:textAppearance="?android:attr/textAppearanceMedium" />
+        android:gravity="center"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="12dp"
+        android:text="@string/ime_listening"
+        android:textColor="@color/ime_status_text"
+        android:textSize="14sp" />
 
-    <Button
-        android:id="@+id/mic"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/ime_mic" />
+        android:gravity="center_vertical"
+        android:minHeight="96dp"
+        android:orientation="horizontal">
 
-    <Button
-        android:id="@+id/back_to_keyboard"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/ime_back_keyboard" />
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+
+            <ImageButton
+                android:id="@+id/cancel"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/ime_cancel"
+                android:padding="12dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_ime_cancel" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/stop_button"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="@string/ime_mic_stop"
+            android:focusable="true">
+
+            <dev.erik.voiceinput.VoiceLevelCircleView
+                android:id="@+id/voice_circle"
+                android:clickable="false"
+                android:focusable="false"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </FrameLayout>
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:importantForAccessibility="no" />
+    </LinearLayout>
 </LinearLayout>

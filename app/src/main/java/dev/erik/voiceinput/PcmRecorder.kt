@@ -3,6 +3,8 @@ package dev.erik.voiceinput
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Handler
+import android.os.Looper
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -13,6 +15,9 @@ class PcmRecorder(
     private var thread: Thread? = null
     private val running = AtomicBoolean(false)
     private val buffer = ByteArrayOutputStream()
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    var onLevel: ((rms: Double, isVoice: Boolean) -> Unit)? = null
 
     fun start(): Boolean {
         if (running.get()) return true
@@ -48,6 +53,11 @@ class PcmRecorder(
                     val read = record.read(chunk, 0, chunk.size)
                     if (read > 0) {
                         buffer.write(chunk, 0, read)
+                        val rms = AudioLevel.rmsPcm16Le(chunk, 0, read)
+                        val voice = AudioLevel.isVoice(rms)
+                        onLevel?.let { cb ->
+                            mainHandler.post { cb(rms, voice) }
+                        }
                     }
                 }
             }.also { it.start() }
@@ -77,4 +87,6 @@ class PcmRecorder(
         audioRecord = null
         buffer.reset()
     }
+
+    fun isRecording(): Boolean = running.get()
 }

@@ -9,14 +9,12 @@
     <string name="setup_title">Setup</string>
     <string name="setup_body">1) Enable the keyboard:\nSettings → System → Languages &amp; input → On-screen keyboard → Manage keyboards → enable **Grok Voice Input**\n\n2) Optional — default system voice input (mic in apps):\nSettings → System → Languages &amp; input → Default voice input method → Grok Voice Input\n\n(OEM wording may differ.)</string>
     <string name="ime_subtype_label">Grok Voice Input</string>
-    <string name="ime_hold_to_speak">Hold the mic button and speak</string>
-    <string name="ime_mic">Hold to speak</string>
-    <string name="ime_listening">Listening…</string>
+    <string name="ime_listening">Speak now — tap the circle when done</string>
+    <string name="ime_mic_stop">Stop and transcribe</string>
+    <string name="ime_cancel">Cancel and return to keyboard</string>
     <string name="ime_transcribing">Transcribing…</string>
-    <string name="ime_done">Done — switch back to your keyboard or speak again</string>
-    <string name="ime_failed">Transcription failed</string>
+    <string name="ime_failed">Transcription failed — tap the circle to try again</string>
     <string name="ime_mic_error">Could not start microphone</string>
-    <string name="ime_back_keyboard">Back to keyboard</string>
     <string name="grant_mic">Grant microphone</string>
     <string name="mic_granted">Microphone granted</string>
 </resources>
