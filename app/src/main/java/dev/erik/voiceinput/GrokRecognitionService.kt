@@ -64,6 +64,11 @@ class GrokRecognitionService : RecognitionService() {
 
         scope.launch {
             try {
+                try {
+                    callback.endOfSpeech()
+                } catch (e: RemoteException) {
+                    Log.e(TAG, "endOfSpeech failed", e)
+                }
                 val trimmed = AudioSilenceTrimmer.trimPcm16Le(pcm)
                 val wav = WavEncoder.encodePcm16Mono(trimmed)
                 val text =
