@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Grok Voice Input</string>
+    <string name="api_key_hint">xAI API key</string>
+    <string name="api_key_saved">API key saved</string>
+    <string name="api_key_missing">Add your xAI API key to use voice input</string>
+    <string name="save">Save</string>
+    <string name="language_label">STT language (e.g. en)</string>
+    <string name="setup_title">Setup</string>
+    <string name="setup_body">After saving your API key, set this app as your default voice input:\n\nSettings → System → Languages &amp; input → On-screen keyboard → Default voice input method → Grok Voice Input\n\n(OEM paths may vary slightly.)</string>
+    <string name="grant_mic">Grant microphone</string>
+    <string name="mic_granted">Microphone granted</string>
+</resources>
