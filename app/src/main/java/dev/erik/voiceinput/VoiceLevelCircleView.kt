@@ -22,14 +22,13 @@ class VoiceLevelCircleView @JvmOverloads constructor(
     private val ringPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = dp(3f)
+            strokeWidth = dp(4f)
         }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val pulsePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = dp(2f)
-            alpha = 120
+            strokeWidth = dp(3f)
         }
 
     private var mode = Mode.IDLE
@@ -38,7 +37,13 @@ class VoiceLevelCircleView @JvmOverloads constructor(
     private var pulsePhase = 0f
     private var pulseAnimator: ValueAnimator? = null
 
-    private val baseRadius get() = minOf(width, height) / 2f - dp(8f)
+    private val baseRadius get() = minOf(width, height) / 2f - dp(10f)
+
+    private val colorVoiceActive get() = ContextCompat.getColor(context, R.color.ime_voice_active)
+    private val colorVoiceSoft get() = ContextCompat.getColor(context, R.color.ime_voice_active_soft)
+    private val colorSilent get() = ContextCompat.getColor(context, R.color.ime_voice_silent)
+    private val colorSilentFill get() = ContextCompat.getColor(context, R.color.ime_voice_silent_fill)
+    private val colorRing get() = ContextCompat.getColor(context, R.color.ime_voice_ring)
 
     init {
         isClickable = false
@@ -73,45 +78,49 @@ class VoiceLevelCircleView @JvmOverloads constructor(
     }
 
     private fun drawIdle(canvas: Canvas, cx: Float, cy: Float) {
-        ringPaint.color = ContextCompat.getColor(context, R.color.ime_voice_ring)
-        fillPaint.color = ContextCompat.getColor(context, R.color.ime_voice_silent)
-        fillPaint.alpha = 60
+        ringPaint.color = colorRing
+        fillPaint.color = colorSilentFill
+        fillPaint.alpha = 120
         canvas.drawCircle(cx, cy, baseRadius * 0.55f, fillPaint)
-        canvas.drawCircle(cx, cy, baseRadius * 0.7f, ringPaint)
+        canvas.drawCircle(cx, cy, baseRadius * 0.72f, ringPaint)
     }
 
     private fun drawRecording(canvas: Canvas, cx: Float, cy: Float) {
-        val activeColor =
-            ContextCompat.getColor(
-                context,
-                if (isVoice) R.color.ime_voice_active else R.color.ime_voice_silent,
-            )
-        val softColor = ContextCompat.getColor(context, R.color.ime_voice_active_soft)
+        val voiceScale = if (isVoice) 0.72f + level * 0.28f else 0.56f
+        val outerScale = if (isVoice) 0.88f + level * 0.12f else 0.74f
 
-        val voiceScale = if (isVoice) 0.72f + level * 0.28f else 0.58f
-        val outerScale = if (isVoice) 0.88f + level * 0.12f else 0.72f
+        if (isVoice) {
+            fillPaint.color = colorVoiceSoft
+            fillPaint.alpha = (160 + level * 95).toInt().coerceAtMost(255)
+            ringPaint.color = colorVoiceActive
+            pulsePaint.color = colorVoiceActive
+            pulsePaint.alpha = 180
+        } else {
+            fillPaint.color = colorSilentFill
+            fillPaint.alpha = 200
+            ringPaint.color = colorSilent
+            pulsePaint.alpha = 0
+        }
 
-        fillPaint.color = if (isVoice) softColor else activeColor
-        fillPaint.alpha = if (isVoice) (140 + level * 80).toInt() else 90
         canvas.drawCircle(cx, cy, baseRadius * voiceScale, fillPaint)
-
-        ringPaint.color = activeColor
         canvas.drawCircle(cx, cy, baseRadius * outerScale, ringPaint)
 
         if (isVoice) {
-            pulsePaint.color = softColor
-            val pulseR = baseRadius * (outerScale + 0.06f + level * 0.08f)
+            val pulseR = baseRadius * (outerScale + 0.05f + level * 0.1f)
             canvas.drawCircle(cx, cy, pulseR, pulsePaint)
         }
     }
 
     private fun drawTranscribing(canvas: Canvas, cx: Float, cy: Float) {
-        ringPaint.color = ContextCompat.getColor(context, R.color.ime_voice_active)
-        fillPaint.color = ContextCompat.getColor(context, R.color.ime_voice_active_soft)
-        fillPaint.alpha = 100
-        canvas.drawCircle(cx, cy, baseRadius * 0.6f, fillPaint)
-        val r = baseRadius * (0.75f + pulsePhase * 0.12f)
+        ringPaint.color = colorVoiceActive
+        fillPaint.color = colorVoiceSoft
+        fillPaint.alpha = 180
+        pulsePaint.color = colorVoiceActive
+        pulsePaint.alpha = 140
+        canvas.drawCircle(cx, cy, baseRadius * 0.58f, fillPaint)
+        val r = baseRadius * (0.76f + pulsePhase * 0.14f)
         canvas.drawCircle(cx, cy, r, ringPaint)
+        canvas.drawCircle(cx, cy, r + dp(4f), pulsePaint)
     }
 
     private fun startPulse() {

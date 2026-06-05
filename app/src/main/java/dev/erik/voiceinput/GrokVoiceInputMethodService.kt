@@ -1,6 +1,8 @@
 package dev.erik.voiceinput
 
+import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
+import android.view.ContextThemeWrapper
 import android.view.View
 import android.widget.ImageButton
 import android.widget.TextView
@@ -29,7 +31,12 @@ class GrokVoiceInputMethodService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
-        val view = layoutInflater.inflate(R.layout.voice_input_ime, null)
+        val themedContext =
+            ContextThemeWrapper(this, R.style.Theme_VoiceInput).apply {
+                applyOverrideConfiguration(Configuration(resources.configuration))
+            }
+        val view =
+            layoutInflater.cloneInContext(themedContext).inflate(R.layout.voice_input_ime, null)
         statusView = view.findViewById(R.id.status)
         voiceCircle = view.findViewById(R.id.voice_circle)
 

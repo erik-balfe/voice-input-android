@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@color/ime_background"
+    android:background="@drawable/ime_panel_background"
     android:orientation="vertical"
     android:paddingTop="12dp"
     android:paddingBottom="16dp">
@@ -16,7 +16,8 @@
         android:paddingBottom="12dp"
         android:text="@string/ime_listening"
         android:textColor="@color/ime_status_text"
-        android:textSize="14sp" />
+        android:textSize="15sp"
+        android:textStyle="bold" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -32,31 +33,33 @@
 
             <ImageButton
                 android:id="@+id/cancel"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
                 android:layout_gravity="center"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:background="@drawable/ime_stop_button_background"
                 android:contentDescription="@string/ime_cancel"
-                android:padding="12dp"
+                android:padding="14dp"
                 android:scaleType="centerInside"
-                android:src="@drawable/ic_ime_cancel" />
+                android:src="@drawable/ic_ime_cancel"
+                android:tint="@color/ime_cancel_icon" />
         </FrameLayout>
 
         <FrameLayout
             android:id="@+id/stop_button"
             android:layout_width="96dp"
             android:layout_height="96dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/ime_stop_button_background"
             android:clickable="true"
             android:contentDescription="@string/ime_mic_stop"
-            android:focusable="true">
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackgroundBorderless">
 
             <dev.erik.voiceinput.VoiceLevelCircleView
                 android:id="@+id/voice_circle"
-                android:clickable="false"
-                android:focusable="false"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent" />
+                android:layout_height="match_parent"
+                android:clickable="false"
+                android:focusable="false" />
         </FrameLayout>
 
         <View

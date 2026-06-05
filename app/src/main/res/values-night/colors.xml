@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Voice keyboard — dark theme (follows device night mode) -->
+    <color name="ime_background">#2B2B2F</color>
+    <color name="ime_panel_border">#5F6368</color>
+    <color name="ime_status_text">#F1F3F4</color>
+    <color name="ime_cancel_icon">#F1F3F4</color>
+    <color name="ime_voice_active">#A8C7FA</color>
+    <color name="ime_voice_active_soft">#669DF6</color>
+    <color name="ime_voice_silent">#9AA0A6</color>
+    <color name="ime_voice_silent_fill">#BDC1C6</color>
+    <color name="ime_voice_ring">#DADCE0</color>
+    <color name="ime_stop_button_bg">#3C4043</color>
+</resources>

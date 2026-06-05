@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.VoiceInput" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Day/night follows system setting for IME panel and settings activity -->
+    <style name="Theme.VoiceInput" parent="Theme.AppCompat.DayNight.NoActionBar" />
 </resources>
