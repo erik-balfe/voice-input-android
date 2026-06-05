@@ -15,8 +15,9 @@ Desktop sibling: [voice-input](https://github.com/erik-balfe/voice-input) (COSMI
 
 1. Install the APK (debug or release).
 2. Open **Grok Voice Input** → save your [xAI API key](https://console.x.ai/) → grant microphone.
-3. Set as default voice input (path varies by OEM), e.g.  
-   **Settings → System → Languages & input → On-screen keyboard → Default voice input method → Grok Voice Input**
+3. **Enable the keyboard** (this is where Whisper-style apps show up):  
+   **Settings → System → Languages & input → On-screen keyboard → Manage keyboards → Grok Voice Input → ON**
+4. Switch to it from the keyboard switcher (🌐/mic), or set **Default voice input method** to Grok Voice Input for the system mic button.
 
 ## Build
 

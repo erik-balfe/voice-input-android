@@ -17,7 +17,7 @@ class GrokRecognitionService : RecognitionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val recorder = PcmRecorder()
     private val activeCallback = AtomicReference<Callback?>(null)
-    private val stt = GrokSttClient()
+
 
     override fun onDestroy() {
         recorder.cancel()
@@ -35,8 +35,7 @@ class GrokRecognitionService : RecognitionService() {
             return
         }
 
-        val apiKey = Prefs.getApiKey(this)
-        if (apiKey.isNullOrBlank()) {
+        if (Prefs.getApiKey(this).isNullOrBlank()) {
             sendError(listener, SpeechRecognizer.ERROR_CLIENT, "Missing xAI API key")
             return
         }
@@ -55,12 +54,10 @@ class GrokRecognitionService : RecognitionService() {
             return
         }
 
-        val apiKey =
-            Prefs.getApiKey(this)
-                ?: run {
-                    sendError(callback, SpeechRecognizer.ERROR_CLIENT, "Missing xAI API key")
-                    return
-                }
+        if (Prefs.getApiKey(this).isNullOrBlank()) {
+            sendError(callback, SpeechRecognizer.ERROR_CLIENT, "Missing xAI API key")
+            return
+        }
 
         scope.launch {
             try {
@@ -69,14 +66,7 @@ class GrokRecognitionService : RecognitionService() {
                 } catch (e: RemoteException) {
                     Log.e(TAG, "endOfSpeech failed", e)
                 }
-                val trimmed = AudioSilenceTrimmer.trimPcm16Le(pcm)
-                val wav = WavEncoder.encodePcm16Mono(trimmed)
-                val text =
-                    stt.transcribe(
-                        apiKey = apiKey,
-                        wavBytes = wav,
-                        language = Prefs.getLanguage(this@GrokRecognitionService),
-                    )
+                val text = VoicePipeline.transcribe(this@GrokRecognitionService, pcm)
                 val results = Bundle().apply {
                     putStringArrayList(
                         SpeechRecognizer.RESULTS_RECOGNITION,
