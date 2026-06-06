@@ -27,9 +27,9 @@
         <service
             android:name=".GrokVoiceInputMethodService"
             android:exported="true"
-            android:foregroundServiceType="microphone"
             android:label="@string/ime_subtype_label"
-            android:permission="android.permission.BIND_INPUT_METHOD">
+            android:permission="android.permission.BIND_INPUT_METHOD"
+            android:theme="@style/Theme.VoiceInput.Ime">
             <intent-filter>
                 <action android:name="android.view.InputMethod" />
             </intent-filter>

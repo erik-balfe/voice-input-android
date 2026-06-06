@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/ime_panel_background"
@@ -41,7 +42,7 @@
                 android:padding="14dp"
                 android:scaleType="centerInside"
                 android:src="@drawable/ic_ime_cancel"
-                android:tint="@color/ime_cancel_icon" />
+                app:tint="@color/ime_cancel_icon" />
         </FrameLayout>
 
         <FrameLayout
@@ -51,8 +52,7 @@
             android:background="@drawable/ime_stop_button_background"
             android:clickable="true"
             android:contentDescription="@string/ime_mic_stop"
-            android:focusable="true"
-            android:foreground="?android:attr/selectableItemBackgroundBorderless">
+            android:focusable="true">
 
             <dev.erik.voiceinput.VoiceLevelCircleView
                 android:id="@+id/voice_circle"

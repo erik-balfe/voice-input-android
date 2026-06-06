@@ -1,14 +1,20 @@
 package dev.erik.voiceinput
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
+import androidx.core.content.ContextCompat
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
 class PcmRecorder(
+    private val context: Context? = null,
     private val sampleRate: Int = 16_000,
 ) {
     private var audioRecord: AudioRecord? = null
@@ -19,8 +25,16 @@ class PcmRecorder(
 
     var onLevel: ((rms: Double, isVoice: Boolean) -> Unit)? = null
 
+    fun hasMicPermission(): Boolean {
+        val ctx = context ?: return true
+        return ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
     fun start(): Boolean {
         if (running.get()) return true
+        if (!hasMicPermission()) return false
+
         val minBuf = AudioRecord.getMinBufferSize(
             sampleRate,
             AudioFormat.CHANNEL_IN_MONO,
@@ -28,14 +42,7 @@ class PcmRecorder(
         )
         if (minBuf == AudioRecord.ERROR || minBuf == AudioRecord.ERROR_BAD_VALUE) return false
 
-        val record =
-            AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                minBuf * 4,
-            )
+        val record = createAudioRecord(minBuf) ?: return false
         if (record.state != AudioRecord.STATE_INITIALIZED) {
             record.release()
             return false
@@ -44,7 +51,14 @@ class PcmRecorder(
         buffer.reset()
         running.set(true)
         audioRecord = record
-        record.startRecording()
+        try {
+            record.startRecording()
+        } catch (e: SecurityException) {
+            running.set(false)
+            record.release()
+            audioRecord = null
+            return false
+        }
 
         thread =
             Thread {
@@ -62,6 +76,22 @@ class PcmRecorder(
                 }
             }.also { it.start() }
         return true
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun createAudioRecord(minBuf: Int): AudioRecord? {
+        if (!hasMicPermission()) return null
+        return try {
+            AudioRecord(
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                sampleRate,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                minBuf * 4,
+            )
+        } catch (e: SecurityException) {
+            null
+        }
     }
 
     fun stop(): ByteArray {

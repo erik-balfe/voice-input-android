@@ -15,6 +15,7 @@
     <string name="ime_transcribing">Transcribing…</string>
     <string name="ime_failed">Transcription failed — tap the circle to try again</string>
     <string name="ime_mic_error">Could not start microphone</string>
+    <string name="ime_load_error">Voice keyboard failed to load: %1$s</string>
     <string name="grant_mic">Grant microphone</string>
     <string name="mic_granted">Microphone granted</string>
 </resources>

@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Day/night follows system setting for IME panel and settings activity -->
+    <!-- Settings activity -->
     <style name="Theme.VoiceInput" parent="Theme.AppCompat.DayNight.NoActionBar" />
+
+    <!-- IME must use the platform input-method theme — AppCompat breaks the keyboard window -->
+    <style name="Theme.VoiceInput.Ime" parent="@android:style/Theme.DeviceDefault.InputMethod" />
 </resources>

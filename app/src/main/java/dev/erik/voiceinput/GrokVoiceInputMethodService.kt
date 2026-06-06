@@ -1,11 +1,11 @@
 package dev.erik.voiceinput
 
-import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
-import android.view.ContextThemeWrapper
+import android.util.Log
 import android.view.View
 import android.widget.ImageButton
 import android.widget.TextView
+import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,11 +18,12 @@ import kotlinx.coroutines.withContext
  */
 class GrokVoiceInputMethodService : InputMethodService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val recorder = PcmRecorder()
+    private val recorder = PcmRecorder(this)
 
     private var statusView: TextView? = null
     private var voiceCircle: VoiceLevelCircleView? = null
     private var transcribing = false
+    private var inputView: View? = null
 
     override fun onDestroy() {
         recorder.cancel()
@@ -31,12 +32,19 @@ class GrokVoiceInputMethodService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
-        val themedContext =
-            ContextThemeWrapper(this, R.style.Theme_VoiceInput).apply {
-                applyOverrideConfiguration(Configuration(resources.configuration))
-            }
-        val view =
-            layoutInflater.cloneInContext(themedContext).inflate(R.layout.voice_input_ime, null)
+        return try {
+            val view = layoutInflater.inflate(R.layout.voice_input_ime, null)
+            inputView = view
+            bindInputView(view)
+            view.post { startRecordingSafely() }
+            view
+        } catch (e: Exception) {
+            Log.e(TAG, "onCreateInputView failed", e)
+            fallbackView(e)
+        }
+    }
+
+    private fun bindInputView(view: View) {
         statusView = view.findViewById(R.id.status)
         voiceCircle = view.findViewById(R.id.voice_circle)
 
@@ -53,9 +61,28 @@ class GrokVoiceInputMethodService : InputMethodService() {
         recorder.onLevel = { rms, voice ->
             voiceCircle?.setVoiceLevel(AudioLevel.normalizedLevel(rms), voice)
         }
+    }
 
-        startRecording()
+    private fun fallbackView(error: Exception): View {
+        val view = layoutInflater.inflate(R.layout.voice_input_ime_fallback, null)
+        inputView = view
+        view.findViewById<TextView>(R.id.status)?.text =
+            getString(R.string.ime_load_error, error.message ?: "unknown")
+        view.findViewById<View>(R.id.cancel)?.setOnClickListener {
+            returnToKeyboard()
+        }
         return view
+    }
+
+    private fun startRecordingSafely() {
+        try {
+            startRecording()
+        } catch (e: Exception) {
+            Log.e(TAG, "startRecording failed", e)
+            voiceCircle?.setMode(VoiceLevelCircleView.Mode.IDLE)
+            setStatus(getString(R.string.ime_mic_error))
+            Toast.makeText(this, R.string.ime_mic_error, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun startRecording() {
@@ -91,10 +118,11 @@ class GrokVoiceInputMethodService : InputMethodService() {
                 currentInputConnection?.commitText("$text ", 1)
                 returnToKeyboard()
             } catch (e: Exception) {
+                Log.e(TAG, "transcription failed", e)
                 transcribing = false
                 voiceCircle?.setMode(VoiceLevelCircleView.Mode.RECORDING)
                 setStatus(e.message ?: getString(R.string.ime_failed))
-                startRecording()
+                startRecordingSafely()
             }
         }
     }
@@ -106,5 +134,9 @@ class GrokVoiceInputMethodService : InputMethodService() {
 
     private fun setStatus(text: String) {
         statusView?.text = text
+    }
+
+    companion object {
+        private const val TAG = "GrokVoiceIME"
     }
 }

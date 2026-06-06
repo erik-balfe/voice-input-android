@@ -26,8 +26,10 @@ Requires Android SDK, JDK 17–21 (JDK 25 is not supported by Gradle yet), and `
 ```bash
 export ANDROID_HOME=~/Android/Sdk
 export JAVA_HOME=~/.local/jdks/jdk-21.0.11+10   # example
-./gradlew :app:assembleDebug
+./scripts/check.sh   # build + unit tests + lint + APK sanity checks
 ```
+
+Or just `./gradlew :app:assembleDebug`.
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`
 

@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 class GrokRecognitionService : RecognitionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val recorder = PcmRecorder()
+    private val recorder = PcmRecorder(this)
     private val activeCallback = AtomicReference<Callback?>(null)
 
 
