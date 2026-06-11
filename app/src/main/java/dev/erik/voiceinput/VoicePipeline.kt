@@ -13,9 +13,9 @@ object VoicePipeline {
             Prefs.getApiKey(context)
                 ?: throw SttException("Add your xAI API key in Settings")
         validatePcm(pcm)
-        val trimmed = AudioSilenceTrimmer.trimPcm16Le(pcm)
-        validatePcm(trimmed)
-        val wav = WavEncoder.encodePcm16Mono(trimmed)
+        val prepared = AudioPreprocessor.prepareForStt(pcm)
+        validatePcm(prepared)
+        val wav = WavEncoder.encodePcm16Mono(prepared)
         return stt.transcribe(
             apiKey = apiKey,
             wavBytes = wav,

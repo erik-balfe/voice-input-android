@@ -5,8 +5,10 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
@@ -83,15 +85,84 @@ class PcmRecorder(
     @SuppressLint("MissingPermission")
     private fun createAudioRecord(minBuf: Int): AudioRecord? {
         if (!hasMicPermission()) return null
+        val source = resolveAudioSource()
         return try {
-            // MIC = raw capture (closer to desktop arecord). VOICE_RECOGNITION applies heavy DSP.
-            AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                minBuf * 8,
-            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                AudioRecord.Builder()
+                    .setAudioSource(source)
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(sampleRate)
+                            .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                            .build(),
+                    )
+                    .setBufferSizeInBytes(minBuf * 8)
+                    .build()
+            } else {
+                @Suppress("DEPRECATION")
+                AudioRecord(
+                    source,
+                    sampleRate,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    minBuf * 8,
+                )
+            }
+        } catch (e: SecurityException) {
+            null
+        } catch (e: IllegalArgumentException) {
+            if (source != MediaRecorder.AudioSource.MIC) {
+                createAudioRecordWithSource(minBuf, MediaRecorder.AudioSource.MIC)
+            } else {
+                null
+            }
+        } catch (e: UnsupportedOperationException) {
+            if (source != MediaRecorder.AudioSource.MIC) {
+                createAudioRecordWithSource(minBuf, MediaRecorder.AudioSource.MIC)
+            } else {
+                null
+            }
+        }
+    }
+
+    private fun resolveAudioSource(): Int {
+        val ctx = context ?: return MediaRecorder.AudioSource.MIC
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val am = ctx.getSystemService(AudioManager::class.java)
+            if (am?.getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED) == "true") {
+                return MediaRecorder.AudioSource.UNPROCESSED
+            }
+        }
+        return MediaRecorder.AudioSource.MIC
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun createAudioRecordWithSource(minBuf: Int, source: Int): AudioRecord? {
+        if (!hasMicPermission()) return null
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                AudioRecord.Builder()
+                    .setAudioSource(source)
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(sampleRate)
+                            .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                            .build(),
+                    )
+                    .setBufferSizeInBytes(minBuf * 8)
+                    .build()
+            } else {
+                @Suppress("DEPRECATION")
+                AudioRecord(
+                    source,
+                    sampleRate,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    minBuf * 8,
+                )
+            }
         } catch (e: SecurityException) {
             null
         }

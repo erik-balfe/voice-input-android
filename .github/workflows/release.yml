@@ -21,15 +21,20 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      - name: Build debug APK
-        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest --no-daemon
+      - name: Build release APK
+        run: ./gradlew :app:assembleRelease :app:testReleaseUnitTest --no-daemon
+
+      - name: Package release APK
+        run: |
+          VERSION=$(grep 'versionName' app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          cp app/build/outputs/apk/release/app-release.apk "grok-voice-input-${VERSION}.apk"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: grok-voice-input-*.apk
           generate_release_notes: true
           body: |
-            Install `app-debug.apk` on your phone (enable install from unknown sources if needed).
+            Install `grok-voice-input-*.apk` on your phone (enable install from unknown sources if needed).
 
             After install, open **Grok Voice Input** → set API key → enable under **Manage keyboards**.

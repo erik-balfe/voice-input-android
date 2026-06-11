@@ -15,7 +15,7 @@ STT uses `format=true` (inverse text normalization — spoken numbers become dig
 
 ## Install
 
-**GitHub Releases:** [github.com/erik-balfe/voice-input-android/releases](https://github.com/erik-balfe/voice-input-android/releases) — download `app-debug.apk`, install on your phone.
+**GitHub Releases:** [github.com/erik-balfe/voice-input-android/releases](https://github.com/erik-balfe/voice-input-android/releases) — download `grok-voice-input-<version>.apk`, install on your phone.
 
 Or build locally (see below).
 
@@ -37,11 +37,11 @@ export JAVA_HOME=~/.local/jdks/jdk-21.0.11+10   # example
 ./scripts/check.sh   # build + unit tests + lint + APK sanity checks
 ```
 
-Or just `./gradlew :app:assembleDebug`.
+Or just `./gradlew :app:assembleRelease`.
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`
+APK: `app/build/outputs/apk/release/app-release.apk`
 
-Install: `adb install -r app/build/outputs/apk/debug/app-debug.apk`
+Install: `adb install -r app/build/outputs/apk/release/app-release.apk`
 
 ## Privacy
 
