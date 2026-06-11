@@ -1,7 +1,9 @@
 package dev.erik.voiceinput
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,12 +23,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -50,6 +54,7 @@ class SettingsActivity : ComponentActivity() {
         setContent {
             val snackbar = remember { SnackbarHostState() }
             val scope = rememberCoroutineScope()
+            val context = LocalContext.current
             var apiKey by remember { mutableStateOf(Prefs.getApiKey(this) ?: "") }
             var language by remember { mutableStateOf(Prefs.getLanguage(this)) }
 
@@ -107,6 +112,34 @@ class SettingsActivity : ComponentActivity() {
                             },
                         ) {
                             Text(stringResource(R.string.grant_mic))
+                        }
+                        Text(
+                            text = stringResource(R.string.balance_title),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = stringResource(R.string.balance_body),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        TextButton(
+                            onClick = {
+                                try {
+                                    val intent =
+                                        Intent(
+                                            Intent.ACTION_VIEW,
+                                            Uri.parse("https://console.x.ai/team/default/billing"),
+                                        )
+                                    context.startActivity(intent)
+                                } catch (_: android.content.ActivityNotFoundException) {
+                                    scope.launch {
+                                        snackbar.showSnackbar(
+                                            getString(R.string.balance_no_browser),
+                                        )
+                                    }
+                                }
+                            },
+                        ) {
+                            Text(stringResource(R.string.balance_open_console))
                         }
                         Text(
                             text = stringResource(R.string.setup_title),

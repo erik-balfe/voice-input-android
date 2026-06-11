@@ -66,7 +66,9 @@ class PcmRecorder(
                 while (running.get()) {
                     val read = record.read(chunk, 0, chunk.size)
                     if (read > 0) {
-                        buffer.write(chunk, 0, read)
+                        synchronized(buffer) {
+                            buffer.write(chunk, 0, read)
+                        }
                         val rms = AudioLevel.rmsPcm16Le(chunk, 0, read)
                         val voice = AudioLevel.isVoice(rms)
                         onLevel?.let { cb ->
@@ -82,12 +84,13 @@ class PcmRecorder(
     private fun createAudioRecord(minBuf: Int): AudioRecord? {
         if (!hasMicPermission()) return null
         return try {
+            // MIC = raw capture (closer to desktop arecord). VOICE_RECOGNITION applies heavy DSP.
             AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                MediaRecorder.AudioSource.MIC,
                 sampleRate,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
-                minBuf * 4,
+                minBuf * 8,
             )
         } catch (e: SecurityException) {
             null
@@ -96,26 +99,35 @@ class PcmRecorder(
 
     fun stop(): ByteArray {
         running.set(false)
-        thread?.join(1500)
+        val reader = thread
+        reader?.join(5000)
         thread = null
-        audioRecord?.let {
-            try {
-                it.stop()
-            } catch (_: IllegalStateException) {
-            }
-            it.release()
+        releaseRecord()
+        synchronized(buffer) {
+            return buffer.toByteArray()
         }
-        audioRecord = null
-        return buffer.toByteArray()
     }
 
     fun cancel() {
         running.set(false)
-        thread?.join(500)
+        val reader = thread
+        reader?.join(2000)
         thread = null
-        audioRecord?.release()
+        releaseRecord()
+        synchronized(buffer) {
+            buffer.reset()
+        }
+    }
+
+    private fun releaseRecord() {
+        audioRecord?.let { record ->
+            try {
+                record.stop()
+            } catch (_: IllegalStateException) {
+            }
+            record.release()
+        }
         audioRecord = null
-        buffer.reset()
     }
 
     fun isRecording(): Boolean = running.get()

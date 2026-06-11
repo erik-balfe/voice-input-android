@@ -11,9 +11,17 @@ Desktop sibling: [voice-input](https://github.com/erik-balfe/voice-input) (COSMI
 3. Sends WAV to `POST https://api.x.ai/v1/stt`.
 4. Returns the transcript to the focused field.
 
+STT uses `format=true` (inverse text normalization — spoken numbers become digits/symbols where supported) and your chosen `language` code (e.g. `ru`, `en`).
+
+## Install
+
+**GitHub Releases:** [github.com/erik-balfe/voice-input-android/releases](https://github.com/erik-balfe/voice-input-android/releases) — download `app-debug.apk`, install on your phone.
+
+Or build locally (see below).
+
 ## Setup on your phone
 
-1. Install the APK (debug or release).
+1. Install the APK (from Releases or local build).
 2. Open **Grok Voice Input** → save your [xAI API key](https://console.x.ai/) → grant microphone.
 3. **Enable the keyboard** (this is where Whisper-style apps show up):  
    **Settings → System → Languages & input → On-screen keyboard → Manage keyboards → Grok Voice Input → ON**

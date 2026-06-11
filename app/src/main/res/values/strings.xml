@@ -13,9 +13,18 @@
     <string name="ime_mic_stop">Stop and transcribe</string>
     <string name="ime_cancel">Cancel and return to keyboard</string>
     <string name="ime_transcribing">Transcribing…</string>
-    <string name="ime_failed">Transcription failed — tap the circle to try again</string>
+    <string name="ime_failed">Transcription failed — tap Retry</string>
+    <string name="ime_retry">Retry transcription</string>
+    <string name="ime_no_input_connection">Could not insert text — focus the field and tap Retry</string>
+    <string name="notification_channel_name">Voice input</string>
+    <string name="notification_listening">Listening…</string>
     <string name="ime_mic_error">Could not start microphone</string>
     <string name="ime_load_error">Voice keyboard failed to load: %1$s</string>
     <string name="grant_mic">Grant microphone</string>
     <string name="mic_granted">Microphone granted</string>
+    <string name="balance_title">Account balance</string>
+    <string name="balance_body">Voice transcription uses your xAI prepaid credits. Check your balance and top up in the xAI Console (Billing → API spend management).</string>
+    <string name="balance_open_console">View balance in xAI Console</string>
+    <string name="balance_no_browser">No browser available to open the link</string>
+    <string name="language_hint">Use ISO code: en, ru, de… (enables number formatting when format is on)</string>
 </resources>
