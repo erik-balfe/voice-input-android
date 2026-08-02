@@ -93,6 +93,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
         super.onCreate()
         DiagLog.init(this)
         DiagLog.i("ime", "onCreate")
+        PendingSttQueue.kick(this)
     }
 
     override fun onDestroy() {
@@ -194,6 +195,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
             updateListenUi()
             return
         }
+        // Catch up any lock/hide takes whenever the keyboard is shown.
+        PendingSttQueue.kick(this)
         if (readyForNextTake) {
             DiagLog.i("ime", "ensure session: stay ready (paused 0:00)")
             enterReadyState(showTip = false)
@@ -280,6 +283,11 @@ class GrokVoiceInputMethodService : InputMethodService() {
         openAppButton?.setOnClickListener {
             DiagLog.ui("open_settings_tap")
             openSettingsApp()
+        }
+
+        view.findViewById<ImageButton>(R.id.open_history)?.setOnClickListener {
+            DiagLog.ui("open_history_tap")
+            openHistoryApp()
         }
 
         statusView?.setOnLongClickListener {
@@ -533,13 +541,27 @@ class GrokVoiceInputMethodService : InputMethodService() {
         returnToKeyboard()
     }
 
-    /** Gear opens the app (settings / history) — setup, not every-day path. */
+    /** Gear opens the app settings — setup path. */
     private fun openSettingsApp() {
         if (recorder.isRecording() && !transcribing) {
             saveOnlyIfKeepWorthy(notify = true)
         }
         val intent =
             Intent(this, SettingsActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        startActivity(intent)
+        returnToKeyboard()
+    }
+
+    /** History is a first-class recovery path (lock / hide mid-take). */
+    private fun openHistoryApp() {
+        if (recorder.isRecording() && !transcribing) {
+            saveOnlyIfKeepWorthy(notify = true)
+        }
+        PendingSttQueue.kick(this)
+        val intent =
+            Intent(this, HistoryActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
         startActivity(intent)
@@ -563,7 +585,13 @@ class GrokVoiceInputMethodService : InputMethodService() {
             "durationMs" to clip.durationMs,
             "keep" to SessionAudio.shouldKeep(clip),
         )
-        if (!SessionAudio.shouldKeep(clip)) {
+        if (!SessionAudio.shouldSaveOnHide(clip)) {
+            DiagLog.i(
+                "session",
+                "discard on hide",
+                "durationMs" to clip.durationMs,
+                "silent" to SessionAudio.isLikelySilent(clip),
+            )
             endingSession = false
             return
         }
@@ -581,6 +609,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
             if (notify) {
                 Toast.makeText(this, R.string.ime_saved_to_history, Toast.LENGTH_SHORT).show()
             }
+            // Recover transcript in background (lock/hide mid-take).
+            PendingSttQueue.kick(this)
         } else {
             setStatus(formatTimer(0L))
         }
@@ -601,7 +631,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
             "source" to clip.sourceName,
             "peakRms" to "%.3f".format(recorder.peakRms()),
         )
-        if (!SessionAudio.shouldKeep(clip)) {
+        if (!SessionAudio.shouldKeepForFinish(clip)) {
             showIdleError(getString(R.string.ime_too_short))
             return
         }

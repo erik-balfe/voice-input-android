@@ -44,17 +44,36 @@
             android:fontFamily="sans-serif-medium"
             android:letterSpacing="0.05" />
 
-        <ImageButton
-            android:id="@+id/open_app"
-            android:layout_width="40dp"
+        <LinearLayout
+            android:layout_width="wrap_content"
             android:layout_height="40dp"
             android:layout_gravity="end|center_vertical"
-            android:background="@drawable/ime_top_icon_background"
-            android:contentDescription="@string/ime_open_settings"
-            android:padding="8dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_ime_settings"
-            app:tint="@color/ime_top_icon" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/open_history"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/ime_top_icon_background"
+                android:contentDescription="@string/ime_open_history"
+                android:padding="8dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_ime_history"
+                app:tint="@color/ime_top_icon" />
+
+            <ImageButton
+                android:id="@+id/open_app"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/ime_top_icon_background"
+                android:contentDescription="@string/ime_open_settings"
+                android:padding="8dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_ime_settings"
+                app:tint="@color/ime_top_icon" />
+        </LinearLayout>
     </FrameLayout>
 
     <TextView

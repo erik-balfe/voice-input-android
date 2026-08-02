@@ -9,12 +9,15 @@ import org.junit.Test
 
 class SessionAudioTest {
     @Test
-    fun shouldKeepUsesPipelineMinimum() {
+    fun shouldKeepForFinishUsesPipelineMinimum() {
         val short =
             PcmClip(ByteArray(100), sampleRate = 16_000, durationMsHint = 100)
-        val ok = PcmClip(ByteArray(16_000), sampleRate = 16_000) // 0.5s
-        assertFalse(SessionAudio.shouldKeep(short))
-        assertTrue(SessionAudio.shouldKeep(ok))
+        val halfSec = PcmClip(ByteArray(16_000), sampleRate = 16_000) // 0.5s
+        assertFalse(SessionAudio.shouldKeepForFinish(short))
+        assertTrue(SessionAudio.shouldKeepForFinish(halfSec))
+        // Hide path is stricter (1s)
+        assertFalse(SessionAudio.shouldKeep(halfSec))
+        assertTrue(SessionAudio.shouldKeep(PcmClip(ByteArray(32_000), sampleRate = 16_000)))
     }
 
     @Test

@@ -53,6 +53,8 @@ class HistoryActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         DiagLog.init(this)
         DiagLog.i("history", "onCreate")
+        // Recover lock/hide takes while user browses History.
+        PendingSttQueue.kick(this)
 
         setContent {
             HistoryScreen()

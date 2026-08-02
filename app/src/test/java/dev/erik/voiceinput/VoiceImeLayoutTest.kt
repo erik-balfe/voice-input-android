@@ -24,6 +24,7 @@ class VoiceImeLayoutTest {
         assertNotNull(view.findViewById(R.id.switch_keyboard))
         assertNotNull(view.findViewById(R.id.status))
         assertNotNull(view.findViewById(R.id.open_app))
+        assertNotNull(view.findViewById(R.id.open_history))
         val hint = view.findViewById<View>(R.id.hint)
         assertNotNull(hint)
         assertTrue(

@@ -203,21 +203,27 @@ class RecordingStoreTest {
     }
 
     @Test
-    fun sessionAudioShouldKeepUsesPipelineMin() {
+    fun sessionAudioShouldKeepUsesMeaningfulMin() {
         val short =
             PcmClip(
                 pcm = ByteArray(100),
                 sampleRate = 16_000,
                 durationMsHint = 100,
             )
-        val ok =
+        val halfSec =
             PcmClip(
                 pcm = ByteArray(16_000),
                 sampleRate = 16_000,
             )
+        val oneSecPlus =
+            PcmClip(
+                pcm = ByteArray(32_000),
+                sampleRate = 16_000,
+            )
         assertFalse(SessionAudio.shouldKeep(short))
-        assertTrue(SessionAudio.shouldKeep(ok))
-        assertTrue(ok.durationMs >= VoicePipeline.MIN_DURATION_MS)
+        assertFalse(SessionAudio.shouldKeep(halfSec)) // hide path ≥1s
+        assertTrue(SessionAudio.shouldKeepForFinish(halfSec))
+        assertTrue(SessionAudio.shouldKeep(oneSecPlus))
     }
 
     @Test
