@@ -18,4 +18,7 @@
     <color name="ime_progress">#0B57D0</color>
     <color name="ime_hint_text">#5F6368</color>
     <color name="ime_stop_button_bg">#FFFFFF</color>
+    <color name="ime_done_highlight_fill">#E6F4EA</color>
+    <color name="ime_done_highlight_stroke">#1E8E3E</color>
+    <color name="ime_done_icon_highlight">#137333</color>
 </resources>

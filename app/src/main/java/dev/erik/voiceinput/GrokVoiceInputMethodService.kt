@@ -1,15 +1,19 @@
 package dev.erik.voiceinput
 
+import android.content.Context
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -362,6 +366,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
             return
         }
         listenStartedAt = System.currentTimeMillis()
+        updateDoneHighlight(emphasized = true)
         mainHandler.removeCallbacks(listenTicker)
         mainHandler.post(listenTicker)
         updateListenUi()
@@ -385,6 +390,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.PAUSED)
         hideRetry()
         showDoneButton()
+        updateDoneHighlight(emphasized = false)
         setStatus(formatTimer(0L))
         if (showTip) {
             showHint(R.string.ime_tip_ready, hideAfterMs = 2800L)
@@ -403,13 +409,37 @@ class GrokVoiceInputMethodService : InputMethodService() {
             recorder.resume()
             voiceCircle?.setMode(VoiceLevelCircleView.Mode.RECORDING)
             clearHint()
+            // Still recording (paused mid-take) — keep ✓ emphasized.
+            updateDoneHighlight(emphasized = true)
         } else {
             recorder.pause()
             pauseStartedAt = System.currentTimeMillis()
             voiceCircle?.setMode(VoiceLevelCircleView.Mode.PAUSED)
-            showHint(R.string.ime_hint_paused, hideAfterMs = 1600L)
+            showHint(R.string.ime_hint_tap_done, hideAfterMs = 2500L)
+            updateDoneHighlight(emphasized = true)
         }
         updateListenUi()
+    }
+
+    /**
+     * Green outline on ✓ while a take is active (listening or paused) so “complete”
+     * is distinct from the center play/pause orb.
+     */
+    private fun updateDoneHighlight(emphasized: Boolean) {
+        val btn = doneButton ?: return
+        if (emphasized) {
+            btn.setBackgroundResource(R.drawable.ime_done_button_highlight)
+            btn.imageTintList =
+                android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(this, R.color.ime_done_icon_highlight),
+                )
+        } else {
+            btn.setBackgroundResource(R.drawable.ime_stop_button_background)
+            btn.imageTintList =
+                android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(this, R.color.ime_status_text),
+                )
+        }
     }
 
     private fun activeListenMs(): Long {
@@ -748,9 +778,11 @@ class GrokVoiceInputMethodService : InputMethodService() {
 
     private fun showDoneButton() {
         doneButton?.visibility = View.VISIBLE
+        updateDoneHighlight(emphasized = recorder.isRecording() && recorder.isPaused())
     }
 
     private fun hideDoneButton() {
+        updateDoneHighlight(emphasized = false)
         doneButton?.visibility = View.GONE
     }
 
@@ -793,8 +825,70 @@ class GrokVoiceInputMethodService : InputMethodService() {
             transcribeJob?.cancel()
         }
         endingSession = false
-        requestHideSelf(0)
-        switchToPreviousInputMethod()
+        switchToTypingKeyboard()
+    }
+
+    /**
+     * Leave voice IME for a normal typing keyboard.
+     * [switchToPreviousInputMethod] alone often only hides us when the system
+     * never recorded a “previous” IME — try several fallbacks.
+     */
+    private fun switchToTypingKeyboard() {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        val token = window?.window?.attributes?.token
+
+        // 1) API path on InputMethodService
+        val switchedPrev =
+            try {
+                switchToPreviousInputMethod()
+            } catch (e: Exception) {
+                DiagLog.w("ime", "switchToPrevious failed", "err" to e.message)
+                false
+            }
+        if (switchedPrev) {
+            DiagLog.i("ime", "switched via switchToPreviousInputMethod")
+            return
+        }
+
+        // 2) Last IME used on this token (works more often after picker switch)
+        if (token != null) {
+            @Suppress("DEPRECATION")
+            val switchedLast =
+                try {
+                    imm.switchToLastInputMethod(token)
+                } catch (e: Exception) {
+                    DiagLog.w("ime", "switchToLastInputMethod failed", "err" to e.message)
+                    false
+                }
+            if (switchedLast) {
+                DiagLog.i("ime", "switched via switchToLastInputMethod")
+                return
+            }
+        }
+
+        // 3) Next IME (skip only-current) — may land on typing keyboard
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && token != null) {
+            val switchedNext =
+                try {
+                    imm.switchToNextInputMethod(token, false /* onlyCurrentIme */)
+                } catch (e: Exception) {
+                    DiagLog.w("ime", "switchToNext failed", "err" to e.message)
+                    false
+                }
+            if (switchedNext) {
+                DiagLog.i("ime", "switched via switchToNextInputMethod")
+                return
+            }
+        }
+
+        // 4) Last resort: system picker so user can pick Gboard / Samsung / etc.
+        DiagLog.w("ime", "fallback showInputMethodPicker")
+        try {
+            imm.showInputMethodPicker()
+        } catch (e: Exception) {
+            DiagLog.e("ime", "showInputMethodPicker failed", e)
+            requestHideSelf(0)
+        }
     }
 
     private fun setStatus(text: String) {

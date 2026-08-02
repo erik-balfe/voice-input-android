@@ -37,6 +37,12 @@
     <string name="ime_tip_speak">Speak · ✓ to finish</string>
     <string name="ime_hint_listening">Speak now</string>
     <string name="ime_hint_paused">Paused</string>
+    <string name="ime_hint_tap_done">Tap ✓ to insert text</string>
+    <string name="settings_test_connection">Test connection</string>
+    <string name="settings_test_ok">Connection OK — authentication works</string>
+    <string name="settings_test_fail">Connection failed: %1$s</string>
+    <string name="settings_section_account">Account</string>
+    <string name="settings_section_dictation">Dictation</string>
     <string name="ime_hint_processing"></string>
     <string name="ime_hint_failed">Tap retry or open History</string>
     <string name="ime_transcribing">…</string>
@@ -94,7 +100,9 @@
     <string name="auth_active_label">%1$s</string>
     <string name="auth_choose_title">STT will use</string>
     <string name="auth_pref_oauth">OAuth — SuperGrok / subscription quota</string>
+    <string name="auth_pref_oauth_short">Sign in with xAI (subscription)</string>
     <string name="auth_pref_api_key">API key — pay-per-token credits</string>
+    <string name="auth_pref_api_short">API key</string>
     <string name="auth_pref_saved">STT method: %1$s</string>
     <string name="oauth_section">OAuth session</string>
     <string name="oauth_status_in">Signed in (tokens on device)</string>

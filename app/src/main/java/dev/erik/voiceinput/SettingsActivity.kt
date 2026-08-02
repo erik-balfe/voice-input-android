@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.clickable
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -37,6 +37,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -51,7 +52,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Lean settings: auth + language first; History/mic/limits/logs under Advanced.
+ * Product settings only: account, dictation prefs, history.
+ * Advanced (mic path, storage caps, logs) is collapsed and secondary.
  */
 class SettingsActivity : ComponentActivity() {
     private val requestMic =
@@ -79,13 +81,14 @@ class SettingsActivity : ComponentActivity() {
             var apiKeyPreview by remember { mutableStateOf(Prefs.apiKeyPreview(this)) }
             var apiKeyDraft by remember { mutableStateOf("") }
             var language by remember { mutableStateOf(Prefs.getLanguage(this)) }
-            var micMode by remember { mutableStateOf(Prefs.getMicMode(this)) }
             var keepIme by remember { mutableStateOf(Prefs.isKeepImeAfterStt(this)) }
             var loginStatus by remember { mutableStateOf("") }
             var loginInProgress by remember { mutableStateOf(false) }
-            var probeResult by remember { mutableStateOf("") }
+            var probeOk by remember { mutableStateOf<Boolean?>(null) }
+            var probeMessage by remember { mutableStateOf("") }
             var probeRunning by remember { mutableStateOf(false) }
             var showAdvanced by remember { mutableStateOf(false) }
+            var micMode by remember { mutableStateOf(Prefs.getMicMode(this)) }
             var historyMaxItems by remember {
                 mutableStateOf(Prefs.getHistoryMaxItems(this).toString())
             }
@@ -109,26 +112,22 @@ class SettingsActivity : ComponentActivity() {
                                 .padding(padding)
                                 .padding(20.dp)
                                 .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         Text(
                             text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.headlineMedium,
                         )
 
-                        // ── Auth (primary) ────────────────────────────
+                        // ── Account ───────────────────────────────────
                         Text(
-                            text = stringResource(R.string.auth_title),
+                            text = stringResource(R.string.settings_section_account),
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            text = stringResource(R.string.auth_body_short),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text(
                             text = XaiOauth.activeCredentialLabel(this@SettingsActivity),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.primary,
                         )
 
@@ -160,7 +159,16 @@ class SettingsActivity : ComponentActivity() {
                                         refreshAuthUi()
                                     },
                                 )
-                                Text(text = mode.label, modifier = Modifier.padding(start = 8.dp))
+                                Text(
+                                    text =
+                                        when (mode) {
+                                            AuthPreference.OAUTH ->
+                                                stringResource(R.string.auth_pref_oauth_short)
+                                            AuthPreference.API_KEY ->
+                                                stringResource(R.string.auth_pref_api_short)
+                                        },
+                                    modifier = Modifier.padding(start = 8.dp),
+                                )
                             }
                         }
 
@@ -195,8 +203,11 @@ class SettingsActivity : ComponentActivity() {
                                                             start,
                                                         )
                                                     }
-                                                    loginStatus = getString(R.string.oauth_success)
+                                                    loginStatus = ""
                                                     refreshAuthUi()
+                                                    snackbar.showSnackbar(
+                                                        getString(R.string.oauth_success),
+                                                    )
                                                 } catch (e: Exception) {
                                                     loginStatus =
                                                         getString(
@@ -217,7 +228,8 @@ class SettingsActivity : ComponentActivity() {
                                     onClick = {
                                         XaiOauth.logout(this@SettingsActivity)
                                         refreshAuthUi()
-                                        loginStatus = ""
+                                        probeOk = null
+                                        probeMessage = ""
                                     },
                                 ) {
                                     Text(stringResource(R.string.oauth_sign_out))
@@ -232,18 +244,16 @@ class SettingsActivity : ComponentActivity() {
                         }
 
                         if (authPref == AuthPreference.API_KEY) {
-                            Text(
-                                text =
-                                    if (hasApiKey) {
+                            if (hasApiKey) {
+                                Text(
+                                    text =
                                         getString(
                                             R.string.api_key_status_present,
                                             apiKeyPreview ?: "••••",
-                                        )
-                                    } else {
-                                        getString(R.string.api_key_status_none)
-                                    },
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
+                                        ),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
                             OutlinedTextField(
                                 modifier = Modifier.fillMaxWidth(),
                                 value = apiKeyDraft,
@@ -263,6 +273,11 @@ class SettingsActivity : ComponentActivity() {
                                                 AuthPreference.API_KEY,
                                             )
                                             refreshAuthUi()
+                                            scope.launch {
+                                                snackbar.showSnackbar(
+                                                    getString(R.string.api_key_saved),
+                                                )
+                                            }
                                         }
                                     },
                                 ) {
@@ -273,6 +288,7 @@ class SettingsActivity : ComponentActivity() {
                                         onClick = {
                                             Prefs.clearApiKey(this@SettingsActivity)
                                             refreshAuthUi()
+                                            probeOk = null
                                         },
                                     ) {
                                         Text(stringResource(R.string.api_key_clear))
@@ -285,17 +301,34 @@ class SettingsActivity : ComponentActivity() {
                             enabled = !probeRunning && XaiOauth.hasAnyAuth(this@SettingsActivity),
                             onClick = {
                                 probeRunning = true
-                                probeResult = getString(R.string.oauth_probe_running)
+                                probeOk = null
+                                probeMessage = ""
                                 scope.launch {
                                     try {
-                                        probeResult =
+                                        val raw =
                                             withContext(Dispatchers.IO) {
                                                 XaiOauth.probeStt(this@SettingsActivity)
                                             }
+                                        // probeStt returns "HTTP 200 …" on success path
+                                        val ok = raw.contains("HTTP 200")
+                                        probeOk = ok
+                                        probeMessage =
+                                            if (ok) {
+                                                getString(R.string.settings_test_ok)
+                                            } else {
+                                                // User-friendly line, not full JSON
+                                                val first =
+                                                    raw.lineSequence().firstOrNull().orEmpty()
+                                                getString(
+                                                    R.string.settings_test_fail,
+                                                    first.take(120),
+                                                )
+                                            }
                                     } catch (e: Exception) {
-                                        probeResult =
+                                        probeOk = false
+                                        probeMessage =
                                             getString(
-                                                R.string.oauth_probe_fail,
+                                                R.string.settings_test_fail,
                                                 e.message ?: "error",
                                             )
                                     } finally {
@@ -305,25 +338,42 @@ class SettingsActivity : ComponentActivity() {
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text(stringResource(R.string.oauth_probe_stt))
-                        }
-                        if (probeResult.isNotBlank()) {
                             Text(
-                                text = probeResult,
-                                style = MaterialTheme.typography.bodySmall,
+                                if (probeRunning) {
+                                    stringResource(R.string.oauth_probe_running)
+                                } else {
+                                    stringResource(R.string.settings_test_connection)
+                                },
+                            )
+                        }
+                        if (probeMessage.isNotBlank()) {
+                            Text(
+                                text = probeMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color =
+                                    when (probeOk) {
+                                        true -> Color(0xFF137333)
+                                        false -> MaterialTheme.colorScheme.error
+                                        null -> MaterialTheme.colorScheme.onSurface
+                                    },
                             )
                         }
 
-                        // ── Language ──────────────────────────────────
+                        // ── Dictation ─────────────────────────────────
+                        Text(
+                            text = stringResource(R.string.settings_section_dictation),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
                         OutlinedTextField(
                             modifier = Modifier.fillMaxWidth(),
                             value = language,
-                            onValueChange = { language = it },
+                            onValueChange = {
+                                language = it
+                                Prefs.setLanguage(this@SettingsActivity, it)
+                            },
                             label = { Text(stringResource(R.string.language_label)) },
                             singleLine = true,
                         )
-
-                        // ── After dictation ───────────────────────────
                         Row(
                             modifier =
                                 Modifier
@@ -332,7 +382,7 @@ class SettingsActivity : ComponentActivity() {
                                         keepIme = !keepIme
                                         Prefs.setKeepImeAfterStt(this@SettingsActivity, keepIme)
                                     }
-                                    .padding(vertical = 4.dp),
+                                    .padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
@@ -356,21 +406,6 @@ class SettingsActivity : ComponentActivity() {
                             )
                         }
 
-                        Button(
-                            onClick = {
-                                Prefs.setLanguage(this@SettingsActivity, language)
-                                Prefs.setMicMode(this@SettingsActivity, micMode)
-                                Prefs.setAuthPreference(this@SettingsActivity, authPref)
-                                Prefs.setKeepImeAfterStt(this@SettingsActivity, keepIme)
-                                scope.launch {
-                                    snackbar.showSnackbar(getString(R.string.settings_saved))
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(stringResource(R.string.save))
-                        }
-
                         TextButton(
                             onClick = {
                                 startActivity(
@@ -382,7 +417,7 @@ class SettingsActivity : ComponentActivity() {
                             Text(stringResource(R.string.history_open))
                         }
 
-                        // ── Advanced (collapsed, secondary) ───────────
+                        // ── Advanced (secondary) ──────────────────────
                         TextButton(
                             onClick = { showAdvanced = !showAdvanced },
                             modifier = Modifier.fillMaxWidth(),
@@ -411,7 +446,13 @@ class SettingsActivity : ComponentActivity() {
                                             .fillMaxWidth()
                                             .selectable(
                                                 selected = micMode == mode,
-                                                onClick = { micMode = mode },
+                                                onClick = {
+                                                    micMode = mode
+                                                    Prefs.setMicMode(
+                                                        this@SettingsActivity,
+                                                        mode,
+                                                    )
+                                                },
                                                 role = Role.RadioButton,
                                             )
                                             .padding(vertical = 2.dp),
@@ -419,7 +460,10 @@ class SettingsActivity : ComponentActivity() {
                                 ) {
                                     RadioButton(
                                         selected = micMode == mode,
-                                        onClick = { micMode = mode },
+                                        onClick = {
+                                            micMode = mode
+                                            Prefs.setMicMode(this@SettingsActivity, mode)
+                                        },
                                     )
                                     Text(
                                         text = mode.label,
@@ -482,22 +526,6 @@ class SettingsActivity : ComponentActivity() {
                             TextButton(onClick = { shareDiagnostics() }) {
                                 Text(stringResource(R.string.diag_share))
                             }
-                            TextButton(
-                                onClick = {
-                                    DiagLog.clear(this@SettingsActivity)
-                                    scope.launch {
-                                        snackbar.showSnackbar(getString(R.string.diag_cleared))
-                                    }
-                                },
-                            ) {
-                                Text(stringResource(R.string.diag_clear))
-                            }
-
-                            Text(
-                                text = stringResource(R.string.setup_body_short),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                     }
                 }
