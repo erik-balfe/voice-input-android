@@ -7,13 +7,20 @@ import org.junit.Test
 class VoicePipelineTest {
     @Test
     fun rejectsRecordingShorterThan500ms() {
-        val short = ByteArray(VoicePipeline.MIN_PCM_BYTES - 1)
-        val ex = assertThrows(SttException::class.java) { VoicePipeline.validatePcm(short) }
+        val short = PcmClip(ByteArray(1000), sampleRate = 16_000)
+        val ex = assertThrows(SttException::class.java) { VoicePipeline.validateClip(short) }
         assertEquals("Recording too short — speak at least half a second", ex.userMessage)
     }
 
     @Test
     fun acceptsRecordingAt500ms() {
-        VoicePipeline.validatePcm(ByteArray(VoicePipeline.MIN_PCM_BYTES))
+        // 0.5 s @ 16 kHz mono PCM16 = 16000 bytes
+        VoicePipeline.validateClip(PcmClip(ByteArray(16_000), sampleRate = 16_000))
+    }
+
+    @Test
+    fun acceptsHalfSecondAt48k() {
+        // 0.5 s @ 48 kHz = 48000 samples * 2 = 96000 bytes
+        VoicePipeline.validateClip(PcmClip(ByteArray(96_000), sampleRate = 48_000))
     }
 }

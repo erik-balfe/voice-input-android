@@ -28,10 +28,13 @@ class GrokRecognitionService : RecognitionService() {
 
     override fun onCreate() {
         super.onCreate()
+        DiagLog.init(this)
+        DiagLog.i("recognition", "onCreate")
         ensureNotificationChannel()
     }
 
     override fun onDestroy() {
+        DiagLog.i("recognition", "onDestroy")
         sessionGeneration.incrementAndGet()
         stopMicForeground()
         recorder.cancel()
@@ -40,6 +43,13 @@ class GrokRecognitionService : RecognitionService() {
     }
 
     override fun onStartListening(recognizerIntent: Intent, listener: Callback) {
+        DiagLog.beginSession("rec")
+        DiagLog.i(
+            "recognition",
+            "onStartListening",
+            "action" to (recognizerIntent.action ?: ""),
+            "extras" to (recognizerIntent.extras?.keySet()?.joinToString() ?: ""),
+        )
         sessionGeneration.incrementAndGet()
         recorder.cancel()
         activeCallback.set(listener)
@@ -48,11 +58,13 @@ class GrokRecognitionService : RecognitionService() {
             listener.beginningOfSpeech()
         } catch (e: RemoteException) {
             Log.e(TAG, "callback failed", e)
+            DiagLog.e("recognition", "ready/beginning callback failed", e)
             return
         }
 
-        if (Prefs.getApiKey(this).isNullOrBlank()) {
-            sendError(listener, SpeechRecognizer.ERROR_CLIENT, "Missing xAI API key")
+        if (!XaiOauth.hasAnyAuth(this)) {
+            DiagLog.w("recognition", "missing auth")
+            sendError(listener, SpeechRecognizer.ERROR_CLIENT, "Sign in with xAI or add API key")
             return
         }
 
@@ -67,18 +79,19 @@ class GrokRecognitionService : RecognitionService() {
     override fun onStopListening(listener: Callback) {
         val session = sessionGeneration.get()
         val callback = activeCallback.getAndSet(null) ?: listener
-        val pcm = recorder.stop()
+        DiagLog.i("recognition", "onStopListening", "gen" to session)
+        val clip = recorder.stop()
         stopMicForeground()
 
         try {
-            VoicePipeline.validatePcm(pcm)
+            VoicePipeline.validateClip(clip)
         } catch (e: SttException) {
             sendError(callback, SpeechRecognizer.ERROR_SPEECH_TIMEOUT, e.userMessage)
             return
         }
 
-        if (Prefs.getApiKey(this).isNullOrBlank()) {
-            sendError(callback, SpeechRecognizer.ERROR_CLIENT, "Missing xAI API key")
+        if (!XaiOauth.hasAnyAuth(this)) {
+            sendError(callback, SpeechRecognizer.ERROR_CLIENT, "Sign in with xAI or add API key")
             return
         }
 
@@ -88,24 +101,42 @@ class GrokRecognitionService : RecognitionService() {
                     callback.endOfSpeech()
                 } catch (e: RemoteException) {
                     Log.e(TAG, "endOfSpeech failed", e)
+                    DiagLog.e("recognition", "endOfSpeech failed", e)
                 }
-                if (session != sessionGeneration.get()) return@launch
-                val text = VoicePipeline.transcribe(this@GrokRecognitionService, pcm)
-                if (session != sessionGeneration.get()) return@launch
-                val results = Bundle().apply {
-                    putStringArrayList(
-                        SpeechRecognizer.RESULTS_RECOGNITION,
-                        arrayListOf(text),
-                    )
+                if (session != sessionGeneration.get()) {
+                    DiagLog.w("recognition", "session superseded before STT")
+                    return@launch
                 }
+                val wall = System.currentTimeMillis()
+                val text = VoicePipeline.transcribe(this@GrokRecognitionService, clip)
+                val wallMs = System.currentTimeMillis() - wall
+                DiagLog.i(
+                    "recognition",
+                    "results ready",
+                    "wallMs" to wallMs,
+                    "chars" to text.length,
+                )
+                if (session != sessionGeneration.get()) {
+                    DiagLog.w("recognition", "session superseded before results")
+                    return@launch
+                }
+                val results =
+                    Bundle().apply {
+                        putStringArrayList(
+                            SpeechRecognizer.RESULTS_RECOGNITION,
+                            arrayListOf(text),
+                        )
+                    }
                 try {
                     callback.results(results)
                 } catch (e: RemoteException) {
                     Log.e(TAG, "results callback failed", e)
+                    DiagLog.e("recognition", "results callback failed", e)
                 }
             } catch (e: Exception) {
                 if (session != sessionGeneration.get()) return@launch
                 Log.e(TAG, "transcription failed", e)
+                DiagLog.e("recognition", "transcription failed", e)
                 val msg =
                     when (e) {
                         is SttException -> e.userMessage
@@ -117,6 +148,7 @@ class GrokRecognitionService : RecognitionService() {
     }
 
     override fun onCancel(listener: Callback) {
+        DiagLog.i("recognition", "onCancel")
         sessionGeneration.incrementAndGet()
         activeCallback.set(null)
         recorder.cancel()
@@ -125,15 +157,18 @@ class GrokRecognitionService : RecognitionService() {
             listener.error(SpeechRecognizer.ERROR_CLIENT)
         } catch (e: RemoteException) {
             Log.e(TAG, "cancel callback failed", e)
+            DiagLog.e("recognition", "cancel callback failed", e)
         }
     }
 
     private fun sendError(listener: Callback, code: Int, message: String) {
         Log.w(TAG, "recognition error $code: $message")
+        DiagLog.w("recognition", "error", "code" to code, "msg" to message)
         try {
             listener.error(code)
         } catch (e: RemoteException) {
             Log.e(TAG, "error callback failed", e)
+            DiagLog.e("recognition", "error callback failed", e)
         }
     }
 
@@ -161,6 +196,7 @@ class GrokRecognitionService : RecognitionService() {
             @Suppress("DEPRECATION")
             startForeground(NOTIFICATION_ID, notification)
         }
+        DiagLog.i("recognition", "foreground started")
     }
 
     private fun stopMicForeground() {

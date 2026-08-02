@@ -6,6 +6,7 @@
     <color name="ime_background">#E8EAED</color>
     <color name="ime_panel_border">#9AA0A6</color>
     <color name="ime_status_text">#111827</color>
+    <color name="ime_debug_text">#5F6368</color>
     <color name="ime_cancel_icon">#111827</color>
     <color name="ime_voice_active">#0B57D0</color>
     <color name="ime_voice_active_soft">#1A73E8</color>

@@ -1,22 +1,17 @@
 package dev.erik.voiceinput
 
-import kotlin.math.abs
-
 /**
- * Prepares raw mic PCM for STT. Desktop cosmic-scribe sends full clips without trimming
- * trailing pauses — we only strip leading dead air, keep natural endings, and boost quiet takes.
+ * Legacy helpers kept for unit tests only.
+ * Production path ([VoicePipeline]) does **no** trim/normalize/pad — raw PCM only.
  */
 object AudioPreprocessor {
-    private const val FRAME_SAMPLES = 320 // 20 ms at 16 kHz
+    private const val FRAME_SAMPLES = 320
     private const val TAIL_PADDING_MS = 300
     private const val TARGET_PEAK = 28_000
     private const val MIN_PEAK_TO_BOOST = 12_000
 
-    fun prepareForStt(pcm: ByteArray, sampleRate: Int = 16_000): ByteArray {
-        val trimmed = trimLeadingSilence(pcm, sampleRate)
-        val normalized = normalizePeak(trimmed)
-        return addTailPadding(normalized, sampleRate)
-    }
+    /** Identity — production must not process audio. */
+    fun prepareForStt(pcm: ByteArray, sampleRate: Int = 16_000): ByteArray = pcm
 
     fun trimLeadingSilence(pcm: ByteArray, sampleRate: Int = 16_000): ByteArray {
         if (pcm.size < 4) return pcm
@@ -42,7 +37,7 @@ object AudioPreprocessor {
             val hi = pcm[i + 1].toInt()
             val sample = (hi shl 8) or lo
             val s = if (sample and 0x8000 != 0) sample or -0x10000 else sample
-            peak = maxOf(peak, abs(s))
+            peak = maxOf(peak, kotlin.math.abs(s))
             i += 2
         }
         if (peak == 0 || peak >= MIN_PEAK_TO_BOOST) return pcm

@@ -23,10 +23,21 @@ if [[ ! -f "$APK" ]]; then
 fi
 
 echo "==> APK package check"
-aapt dump badging "$APK" | grep -E "package:|application-label:|sdkVersion:|targetSdkVersion:"
-
-echo "==> IME service present"
-aapt dump xmltree "$APK" AndroidManifest.xml | grep -A2 "GrokVoiceInputMethodService" | head -6
+AAPT="${AAPT:-}"
+if [[ -z "$AAPT" ]]; then
+  if command -v aapt >/dev/null 2>&1; then
+    AAPT=aapt
+  elif [[ -n "${ANDROID_HOME:-}" ]]; then
+    AAPT="$(ls -1 "$ANDROID_HOME"/build-tools/*/aapt 2>/dev/null | sort -V | tail -1 || true)"
+  fi
+fi
+if [[ -z "$AAPT" || ! -x "$AAPT" ]]; then
+  echo "WARN: aapt not found — skip APK dump (install Android build-tools or set AAPT=)" >&2
+else
+  "$AAPT" dump badging "$APK" | grep -E "package:|application-label:|sdkVersion:|targetSdkVersion:"
+  echo "==> IME service present"
+  "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -A2 "GrokVoiceInputMethodService" | head -6
+fi
 
 echo "==> All checks passed"
 echo "APK: $APK"

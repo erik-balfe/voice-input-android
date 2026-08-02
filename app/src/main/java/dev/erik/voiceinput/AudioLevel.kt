@@ -24,8 +24,16 @@ object AudioLevel {
         return sum / sampleCount
     }
 
-    fun normalizedLevel(rms: Double): Float =
-        (rms / 4000.0).toFloat().coerceIn(0f, 1f)
+    /**
+     * Map mean-abs level to 0..1 for the UI meter.
+     * Speech typically sits well below 4000; use a softer curve so quiet talk still moves the ring.
+     */
+    fun normalizedLevel(rms: Double): Float {
+        if (rms <= 0.0) return 0f
+        // Soft knee: ~500 quiet, ~2000 normal, ~5000 loud
+        val n = (rms / 2200.0).toFloat()
+        return n.coerceIn(0f, 1f)
+    }
 
     fun isVoice(rms: Double): Boolean = rms >= VOICE_THRESHOLD
 }
