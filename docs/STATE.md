@@ -1,29 +1,33 @@
 # Project state
 
-Last updated: 2026-08-03
+Last updated: 2026-08-03  
+Version: **0.3.2** (cleanup next)
 
-## Where we are
+## Product status
 
-- **STT path works** on device: progressive AAC, OAuth SuperGrok, M4A upload.
-- **History backbone:** RecordingStore, cancel/back save, HistoryActivity.
-- **v0.2.4 UX (this install):**
-  - Pause / resume on IME (mic drain while paused; same progressive encode)
-  - Processing progress bar + % estimate
-  - Meter: waveform bars + paused amber state
-  - Advanced settings: history max items / max MB
-  - Hints under status line
+Production-ready for everyday dogfooding:
+
+- Progressive AAC during capture, OAuth SuperGrok / API key
+- IME multi-take (default keep open → ready at 0:00)
+- Controls: ⌨️ typing IME · ↵ newline · orb listen/pause · ✓ transcribe · ⚙ settings
+- History store (M4A + meta, prune caps); also filled from system RecognitionService
+- Progress ring (optimistic, monotonic, never snaps back)
+- Lean Settings (account, test connection, language, keep-IME; Advanced for mic/limits/logs)
+
+## Deferred (next release candidates)
+
+- Silence cut before upload (VAD; careful false negatives)
+- Optional Opus progressive encode (AAC is fine for STT today)
+
+## Architecture notes
+
+- Product audio on disk: **M4A only** (`RecordingStore`)
+- PCM only in RAM during capture
+- Encrypted prefs **cached** (avoid UI jank)
+- Debug WAV / verbose paths gated; not product defaults
 
 ## Docs
 
-- [REQUIREMENTS.md](./REQUIREMENTS.md)  
-- [PLAN.md](./PLAN.md)  
-- [FEATURE_DESIGN.md](./FEATURE_DESIGN.md)  
-
-## Still deferred
-
-- FG continue-under-lock (v1 remains **stop + save** on hide/lock)
-- Byte-accurate upload progress (time-based estimate now)
-
-## Audio note
-
-**PCM** = RAM only while capturing. **Product storage** = **M4A** only.
+- [REQUIREMENTS.md](./REQUIREMENTS.md)
+- [FEATURE_DESIGN.md](./FEATURE_DESIGN.md) (may lag latest IME control map slightly)
+- [PLAN.md](./PLAN.md)

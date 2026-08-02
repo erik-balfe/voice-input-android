@@ -10,7 +10,6 @@ import android.util.Log
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageButton
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -43,7 +42,6 @@ class GrokVoiceInputMethodService : InputMethodService() {
     private var doneButton: ImageButton? = null
     private var newlineButton: ImageButton? = null
     private var openAppButton: ImageButton? = null
-    private var processProgress: ProgressBar? = null
     private var transcribing = false
     private var transcribeJob: Job? = null
     private var lastFailedClip: PcmClip? = null
@@ -56,7 +54,6 @@ class GrokVoiceInputMethodService : InputMethodService() {
     /** Accumulated paused wall-time so duration only counts active listening. */
     private var pausedAccumMs = 0L
     private var pauseStartedAt = 0L
-    private var phaseLine = ""
     private var endingSession = false
     private var processEstimateMs = 2500L
     private var processStartedAt = 0L
@@ -226,7 +223,6 @@ class GrokVoiceInputMethodService : InputMethodService() {
         doneButton = view.findViewById(R.id.done)
         newlineButton = view.findViewById(R.id.newline)
         openAppButton = view.findViewById(R.id.open_app)
-        processProgress = view.findViewById(R.id.process_progress)
         showDebug = Prefs.isImeDebugOverlay(this)
         debugDetail?.visibility = if (showDebug) View.VISIBLE else View.GONE
         hideProgress()
@@ -334,7 +330,6 @@ class GrokVoiceInputMethodService : InputMethodService() {
         endingSession = false
         lastFailedClip = null
         lastSessionId = null
-        phaseLine = ""
         pausedAccumMs = 0L
         pauseStartedAt = 0L
         hideRetry()
@@ -480,10 +475,6 @@ class GrokVoiceInputMethodService : InputMethodService() {
         val mm = sec / 60
         val ss = sec % 60
         return getString(R.string.ime_timer, mm.toInt(), ss.toInt())
-    }
-
-    private fun showTipBriefly() {
-        // Listening tip is set from startRecording after mic opens.
     }
 
     private fun showHint(resId: Int, hideAfterMs: Long = 0L) {
@@ -687,8 +678,9 @@ class GrokVoiceInputMethodService : InputMethodService() {
         voiceCircle?.resetProgress()
         // Freeze last duration under the ring — no percentage text.
         setStatus(formatTimer(clip.durationMs))
-        phaseLine = "Processing…"
-        updatePhaseOverlay("Processing…")
+        if (showDebug) {
+            debugDetail?.text = "Processing…"
+        }
         mainHandler.removeCallbacks(processTicker)
         mainHandler.post(processTicker)
 
@@ -703,8 +695,11 @@ class GrokVoiceInputMethodService : InputMethodService() {
                                 this@GrokVoiceInputMethodService,
                                 clip,
                             ) { phase ->
-                                phaseLine = phase
-                                mainHandler.post { updatePhaseOverlay(phase) }
+                                if (showDebug) {
+                                    mainHandler.post {
+                                        debugDetail?.text = phase
+                                    }
+                                }
                             }
                         }
                     val totalMs = System.currentTimeMillis() - wallStart
@@ -722,7 +717,6 @@ class GrokVoiceInputMethodService : InputMethodService() {
                         withContext(Dispatchers.IO) { store.markOk(sessionId, text) }
                     }
                     mainHandler.removeCallbacks(processTicker)
-                    updatePhaseOverlay("Insert text… total=${totalMs}ms")
                     val connection = currentInputConnection
                     if (connection == null) {
                         DiagLog.w("ime", "no InputConnection after STT")
@@ -753,19 +747,6 @@ class GrokVoiceInputMethodService : InputMethodService() {
                     showTranscribeError(clip, msg, sessionId)
                 }
             }
-    }
-
-    private fun updatePhaseOverlay(phase: String) {
-        // Product UI: frozen timer + ring only. Debug overlay can show phase.
-        if (!showDebug) return
-        val line =
-            buildString {
-                append("sid=").append(DiagLog.currentSessionId())
-                append("  phase=").append(phase)
-                append('\n')
-                append(DiagLog.lastDetailOnly().ifBlank { DiagLog.lastStatusOnly() })
-            }
-        debugDetail?.text = line
     }
 
     private fun showTranscribeError(clip: PcmClip, message: String, sessionId: String? = lastSessionId) {
@@ -818,7 +799,6 @@ class GrokVoiceInputMethodService : InputMethodService() {
     }
 
     private fun hideProgress() {
-        processProgress?.visibility = View.GONE
         progressDisplay = 0f
         voiceCircle?.resetProgress()
     }

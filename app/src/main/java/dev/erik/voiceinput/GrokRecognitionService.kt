@@ -96,6 +96,26 @@ class GrokRecognitionService : RecognitionService() {
         }
 
         scope.launch {
+            val store = RecordingStore.fromContext(this@GrokRecognitionService)
+            val sessionId =
+                try {
+                    SessionAudio.m4aBytes(clip)?.let { bytes ->
+                        store
+                            .save(
+                                m4aBytes = bytes,
+                                durationMs = clip.durationMs,
+                                status = SessionStatus.PENDING,
+                                language = Prefs.getLanguage(this@GrokRecognitionService),
+                                sampleRate = clip.sampleRate,
+                                sourcePackage = "recognition",
+                                maxItems = Prefs.getHistoryMaxItems(this@GrokRecognitionService),
+                                maxBytes = Prefs.getHistoryMaxBytes(this@GrokRecognitionService),
+                            )?.id
+                    }
+                } catch (e: Exception) {
+                    DiagLog.w("recognition", "history save failed", "err" to e.message)
+                    null
+                }
             try {
                 try {
                     callback.endOfSpeech()
@@ -110,11 +130,13 @@ class GrokRecognitionService : RecognitionService() {
                 val wall = System.currentTimeMillis()
                 val text = VoicePipeline.transcribe(this@GrokRecognitionService, clip)
                 val wallMs = System.currentTimeMillis() - wall
+                if (sessionId != null) store.markOk(sessionId, text)
                 DiagLog.i(
                     "recognition",
                     "results ready",
                     "wallMs" to wallMs,
                     "chars" to text.length,
+                    "sessionId" to (sessionId ?: ""),
                 )
                 if (session != sessionGeneration.get()) {
                     DiagLog.w("recognition", "session superseded before results")
@@ -142,6 +164,7 @@ class GrokRecognitionService : RecognitionService() {
                         is SttException -> e.userMessage
                         else -> SttException.wrap(e).userMessage
                     }
+                if (sessionId != null) store.markFailed(sessionId, msg)
                 sendError(callback, SpeechRecognizer.ERROR_SERVER, msg)
             }
         }

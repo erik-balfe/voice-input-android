@@ -48,11 +48,9 @@ class VoiceLevelCircleView @JvmOverloads constructor(
     private var displayLevel = 0f
     private var targetLevel = 0f
     private var breath = 0f
-    private var spin = 0f
     /** Smooth 0..1 processing progress drawn as ring. */
     private var progress = 0f
     private var breathAnimator: ValueAnimator? = null
-    private var spinAnimator: ValueAnimator? = null
     private var levelAnimator: ValueAnimator? = null
 
     private val baseRadius get() = minOf(width, height) / 2f - dp(10f)
@@ -75,7 +73,6 @@ class VoiceLevelCircleView @JvmOverloads constructor(
         mode = newMode
         when (newMode) {
             Mode.RECORDING -> {
-                stopSpin()
                 progress = 0f
                 targetLevel = 0f
                 displayLevel = 0f
@@ -83,7 +80,6 @@ class VoiceLevelCircleView @JvmOverloads constructor(
                 startLevelSmoothing()
             }
             Mode.PAUSED -> {
-                stopSpin()
                 stopLevelSmoothing()
                 progress = 0f
                 targetLevel = 0f
@@ -95,11 +91,9 @@ class VoiceLevelCircleView @JvmOverloads constructor(
                 targetLevel = 0f
                 displayLevel = 0.25f
                 startBreath(periodMs = 1100)
-                startSpin()
             }
             Mode.IDLE -> {
                 stopBreath()
-                stopSpin()
                 stopLevelSmoothing()
                 targetLevel = 0f
                 displayLevel = 0f
@@ -129,12 +123,6 @@ class VoiceLevelCircleView @JvmOverloads constructor(
             if (t - progress < 0.002f) progress = t
         }
         if (t >= 0.999f) progress = 1f
-        invalidate()
-    }
-
-    /** Jump to full immediately when STT is done (no lerp that lags or reverses). */
-    fun completeProgress() {
-        progress = 1f
         invalidate()
     }
 
@@ -268,28 +256,6 @@ class VoiceLevelCircleView @JvmOverloads constructor(
         breath = 0f
     }
 
-    private fun startSpin() {
-        stopSpin()
-        spinAnimator =
-            ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = 4000
-                repeatMode = ValueAnimator.RESTART
-                repeatCount = ValueAnimator.INFINITE
-                interpolator = LinearInterpolator()
-                addUpdateListener {
-                    spin = it.animatedValue as Float
-                    invalidate()
-                }
-                start()
-            }
-    }
-
-    private fun stopSpin() {
-        spinAnimator?.cancel()
-        spinAnimator = null
-        spin = 0f
-    }
-
     private fun startLevelSmoothing() {
         stopLevelSmoothing()
         levelAnimator =
@@ -314,7 +280,6 @@ class VoiceLevelCircleView @JvmOverloads constructor(
 
     override fun onDetachedFromWindow() {
         stopBreath()
-        stopSpin()
         stopLevelSmoothing()
         super.onDetachedFromWindow()
     }
