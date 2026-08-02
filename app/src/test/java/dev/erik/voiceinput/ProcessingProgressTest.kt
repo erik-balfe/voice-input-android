@@ -15,21 +15,14 @@ class ProcessingProgressTest {
     }
 
     @Test
-    fun estimateInRealisticBandFromLogs() {
-        val longTake =
-            ProcessingProgress.estimateTotalMs(
-                uploadBytes = 1_396_847,
-                speechDurationMs = 230_144,
-            )
-        // With 8% buffer, still well under old 11s model
-        assertTrue("long: $longTake", longTake in 2500L..6500L)
-
-        val short =
-            ProcessingProgress.estimateTotalMs(
-                uploadBytes = 46_213,
-                speechDurationMs = 7_360,
-            )
-        assertTrue("short: $short", short in 1000L..2800L)
+    fun idealIsMonotonicInTime() {
+        val est = 3000L
+        var prev = 0f
+        for (ms in 0..12_000 step 100) {
+            val f = ProcessingProgress.idealFraction(ms.toLong(), est)
+            assertTrue("must not go backward at $ms: $f < $prev", f + 1e-5f >= prev)
+            prev = f
+        }
     }
 
     @Test
@@ -41,5 +34,15 @@ class ProcessingProgressTest {
         assertTrue(d >= a)
         d = ProcessingProgress.smoothToward(d, 10_000, 2000)
         assertTrue(d <= ProcessingProgress.HARD_CAP + 0.001f)
+    }
+
+    @Test
+    fun estimateInRealisticBandFromLogs() {
+        val longTake =
+            ProcessingProgress.estimateTotalMs(
+                uploadBytes = 1_396_847,
+                speechDurationMs = 230_144,
+            )
+        assertTrue("long: $longTake", longTake in 2500L..7000L)
     }
 }

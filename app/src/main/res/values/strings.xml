@@ -27,6 +27,8 @@
     <string name="ime_open_settings">Settings</string>
     <string name="settings_advanced_link">Advanced…</string>
     <string name="settings_advanced_hide">Hide advanced</string>
+    <string name="settings_keep_ime_title">Stay on voice keyboard after dictation</string>
+    <string name="settings_keep_ime_body">When on, after text is inserted you can speak again immediately. Tap ✕ to return to your typing keyboard.</string>
     <string name="ime_tip_speak">Speak now</string>
     <string name="ime_hint_listening">Speak now</string>
     <string name="ime_hint_paused">Paused</string>

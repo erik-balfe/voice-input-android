@@ -321,26 +321,21 @@ object XaiOauth {
             AuthPreference.API_KEY -> Prefs.hasApiKey(context)
         }
 
-    /** What STT will actually use right now (for Settings / IME). */
+    /** Short user-facing status (no team IDs / debug claims). */
     fun activeCredentialLabel(context: Context): String {
         val pref = Prefs.getAuthPreference(context)
         return when (pref) {
             AuthPreference.OAUTH ->
                 if (isLoggedIn(context)) {
-                    val team = tokenInfo(context)?.teamId?.take(8)
-                    if (team.isNullOrBlank()) {
-                        "ACTIVE: OAuth (subscription quota)"
-                    } else {
-                        "ACTIVE: OAuth team=$team…"
-                    }
+                    "Signed in with xAI"
                 } else {
-                    "SELECTED: OAuth — not signed in"
+                    "Sign in with xAI to use subscription"
                 }
             AuthPreference.API_KEY ->
                 if (Prefs.hasApiKey(context)) {
-                    "ACTIVE: API key (${Prefs.apiKeyPreview(context)})"
+                    "API key saved (${Prefs.apiKeyPreview(context)})"
                 } else {
-                    "SELECTED: API key — none saved"
+                    "Add an API key"
                 }
         }
     }

@@ -601,7 +601,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
                     }
                     mainHandler.removeCallbacks(processTicker)
                     progressDisplay = 1f
-                    voiceCircle?.setProgress(1f)
+                    voiceCircle?.completeProgress()
                     updatePhaseOverlay("Insert text… total=${totalMs}ms")
                     val connection = currentInputConnection
                     if (connection == null) {
@@ -617,7 +617,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
                     connection.commitText("$text ", 1)
                     val commitMs = (System.nanoTime() - commitStart) / 1_000_000L
                     DiagLog.i("ime", "commitText", "ms" to commitMs, "chars" to text.length)
-                    returnToKeyboard()
+                    afterSuccessfulInsert()
                 } catch (e: Exception) {
                     Log.e(TAG, "transcription failed", e)
                     DiagLog.e("ime", "transcription failed", e)
@@ -700,6 +700,33 @@ class GrokVoiceInputMethodService : InputMethodService() {
         processProgress?.visibility = View.GONE
         progressDisplay = 0f
         voiceCircle?.resetProgress()
+    }
+
+    /**
+     * After text is inserted: either stay on voice IME for another take, or return
+     * to the previous (typing) keyboard — controlled by Settings.
+     */
+    private fun afterSuccessfulInsert() {
+        transcribing = false
+        lastFailedClip = null
+        lastSessionId = null
+        endingSession = false
+        mainHandler.removeCallbacks(processTicker)
+        if (Prefs.isKeepImeAfterStt(this)) {
+            DiagLog.ui("after_insert", "keepIme" to true)
+            // Brief beat at full ring, then fresh listen (no layout jump).
+            mainHandler.postDelayed(
+                {
+                    if (!isInputViewShown) return@postDelayed
+                    hideProgress()
+                    startRecordingSafely()
+                },
+                180L,
+            )
+        } else {
+            DiagLog.ui("after_insert", "keepIme" to false)
+            returnToKeyboard(cancelJob = true)
+        }
     }
 
     private fun returnToKeyboard(cancelJob: Boolean = true) {

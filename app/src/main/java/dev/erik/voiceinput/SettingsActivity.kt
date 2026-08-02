@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -26,6 +27,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
@@ -78,6 +80,7 @@ class SettingsActivity : ComponentActivity() {
             var apiKeyDraft by remember { mutableStateOf("") }
             var language by remember { mutableStateOf(Prefs.getLanguage(this)) }
             var micMode by remember { mutableStateOf(Prefs.getMicMode(this)) }
+            var keepIme by remember { mutableStateOf(Prefs.isKeepImeAfterStt(this)) }
             var loginStatus by remember { mutableStateOf("") }
             var loginInProgress by remember { mutableStateOf(false) }
             var probeResult by remember { mutableStateOf("") }
@@ -311,7 +314,7 @@ class SettingsActivity : ComponentActivity() {
                             )
                         }
 
-                        // ── Language (common) ─────────────────────────
+                        // ── Language ──────────────────────────────────
                         OutlinedTextField(
                             modifier = Modifier.fillMaxWidth(),
                             value = language,
@@ -319,11 +322,46 @@ class SettingsActivity : ComponentActivity() {
                             label = { Text(stringResource(R.string.language_label)) },
                             singleLine = true,
                         )
+
+                        // ── After dictation ───────────────────────────
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        keepIme = !keepIme
+                                        Prefs.setKeepImeAfterStt(this@SettingsActivity, keepIme)
+                                    }
+                                    .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                Text(
+                                    text = stringResource(R.string.settings_keep_ime_title),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                Text(
+                                    text = stringResource(R.string.settings_keep_ime_body),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(
+                                checked = keepIme,
+                                onCheckedChange = {
+                                    keepIme = it
+                                    Prefs.setKeepImeAfterStt(this@SettingsActivity, it)
+                                },
+                            )
+                        }
+
                         Button(
                             onClick = {
                                 Prefs.setLanguage(this@SettingsActivity, language)
                                 Prefs.setMicMode(this@SettingsActivity, micMode)
                                 Prefs.setAuthPreference(this@SettingsActivity, authPref)
+                                Prefs.setKeepImeAfterStt(this@SettingsActivity, keepIme)
                                 scope.launch {
                                     snackbar.showSnackbar(getString(R.string.settings_saved))
                                 }
@@ -333,7 +371,6 @@ class SettingsActivity : ComponentActivity() {
                             Text(stringResource(R.string.save))
                         }
 
-                        // Secondary: History
                         TextButton(
                             onClick = {
                                 startActivity(

@@ -21,6 +21,7 @@ object Prefs {
     private const val KEY_OAUTH_INFO = "oauth_token_info_summary"
     private const val KEY_HISTORY_MAX_ITEMS = "history_max_items"
     private const val KEY_HISTORY_MAX_BYTES = "history_max_bytes"
+    private const val KEY_KEEP_IME_AFTER_STT = "keep_ime_after_stt"
 
     private fun prefs(context: Context) =
         EncryptedSharedPreferences.create(
@@ -121,6 +122,17 @@ object Prefs {
 
     fun setHistoryMaxBytes(context: Context, bytes: Long) {
         prefs(context).edit().putLong(KEY_HISTORY_MAX_BYTES, bytes.coerceAtLeast(1L)).apply()
+    }
+
+    /**
+     * When true, after successful dictation keep the voice keyboard open for another take.
+     * When false (default), switch back to the previous keyboard after insert.
+     */
+    fun isKeepImeAfterStt(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_KEEP_IME_AFTER_STT, false)
+
+    fun setKeepImeAfterStt(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_KEEP_IME_AFTER_STT, enabled).apply()
     }
 
     // ── xAI OAuth (encrypted) ─────────────────────────────────

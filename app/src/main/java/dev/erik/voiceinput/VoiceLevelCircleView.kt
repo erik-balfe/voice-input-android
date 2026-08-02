@@ -116,12 +116,25 @@ class VoiceLevelCircleView @JvmOverloads constructor(
         }
     }
 
-    /** Smooth processing fraction 0..1 for the ring around the orb. */
+    /**
+     * Processing fraction 0..1 for the ring.
+     * **Strictly monotonic** — never decreases (avoids the “went back 15%” bug).
+     * Call [resetProgress] only when starting a new process.
+     */
     fun setProgress(fraction: Float) {
         val t = fraction.coerceIn(0f, 1f)
-        // Ease toward target for buttery motion (called ~60fps from ticker).
-        progress += (t - progress) * 0.22f
+        if (t > progress) {
+            // Light ease-up only when moving forward (no second pass that can undershoot).
+            progress += (t - progress) * 0.28f
+            if (t - progress < 0.002f) progress = t
+        }
         if (t >= 0.999f) progress = 1f
+        invalidate()
+    }
+
+    /** Jump to full immediately when STT is done (no lerp that lags or reverses). */
+    fun completeProgress() {
+        progress = 1f
         invalidate()
     }
 
@@ -214,15 +227,23 @@ class VoiceLevelCircleView @JvmOverloads constructor(
         val r = baseRadius * 0.72f
         canvas.drawCircle(cx, cy, r, ringPaint)
 
-        // Progress arc (smooth)
+        // Progress arc — fixed start at top; never rotate the arc (rotation looked like reverse).
         progressPaint.color = colorProgress
         progressPaint.alpha = 255
         progressPaint.strokeWidth = dp(4.5f)
-        val sweep = 360f * progress.coerceIn(0f, 1f)
-        canvas.save()
-        canvas.rotate(-90f + spin * 12f, cx, cy) // slight drift so idle network still feels alive
-        canvas.drawArc(cx - r, cy - r, cx + r, cy + r, 0f, sweep, false, progressPaint)
-        canvas.restore()
+        val p = progress.coerceIn(0f, 1f)
+        val sweep = 360f * p
+        canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90f, sweep, false, progressPaint)
+
+        // Tiny “alive” tip on the arc head while waiting (does not move the filled portion).
+        if (p in 0.02f..0.98f) {
+            val ang = Math.toRadians((-90f + sweep).toDouble())
+            val tx = cx + r * kotlin.math.cos(ang).toFloat()
+            val ty = cy + r * kotlin.math.sin(ang).toFloat()
+            fillPaint.color = colorProgress
+            fillPaint.alpha = 220
+            canvas.drawCircle(tx, ty, dp(3.5f), fillPaint)
+        }
     }
 
     private fun startBreath(periodMs: Long) {
