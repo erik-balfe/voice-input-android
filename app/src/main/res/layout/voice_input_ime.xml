@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Fixed panel height: no GONE/VISIBLE height jumps (hint row always reserved). -->
+<!-- Fixed panel height. UX: ↵ newline · orb listen/pause · ✓ done · top ⌨️ exit typing IME -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -13,7 +13,19 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="40dp"
-        android:paddingHorizontal="8dp">
+        android:paddingHorizontal="4dp">
+
+        <ImageButton
+            android:id="@+id/switch_keyboard"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="start|center_vertical"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/ime_switch_keyboard"
+            android:padding="8dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_ime_keyboard"
+            app:tint="@color/ime_status_text" />
 
         <TextView
             android:id="@+id/status"
@@ -42,7 +54,6 @@
             app:tint="@color/ime_status_text" />
     </FrameLayout>
 
-    <!-- Always takes space (INVISIBLE when empty) so pause/tips never resize the panel. -->
     <TextView
         android:id="@+id/hint"
         android:layout_width="match_parent"
@@ -60,12 +71,11 @@
         android:layout_height="wrap_content"
         android:fontFamily="monospace"
         android:gravity="center"
-        android:lineSpacingExtra="2dp"
+        android:maxLines="2"
         android:paddingHorizontal="12dp"
         android:textColor="@color/ime_debug_text"
         android:textSize="11sp"
-        android:visibility="gone"
-        android:maxLines="2" />
+        android:visibility="gone" />
 
     <ProgressBar
         android:id="@+id/process_progress"
@@ -81,31 +91,33 @@
         android:orientation="horizontal"
         android:paddingTop="2dp">
 
+        <!-- New paragraph -->
         <FrameLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1">
 
             <ImageButton
-                android:id="@+id/cancel"
+                android:id="@+id/newline"
                 android:layout_width="52dp"
                 android:layout_height="52dp"
                 android:layout_gravity="center"
                 android:background="@drawable/ime_stop_button_background"
-                android:contentDescription="@string/ime_cancel"
+                android:contentDescription="@string/ime_newline"
                 android:padding="14dp"
                 android:scaleType="centerInside"
-                android:src="@drawable/ic_ime_cancel"
+                android:src="@drawable/ic_ime_newline"
                 app:tint="@color/ime_status_text" />
         </FrameLayout>
 
+        <!-- Orb: listen / pause (primary) -->
         <FrameLayout
-            android:id="@+id/stop_button"
+            android:id="@+id/orb_button"
             android:layout_width="100dp"
             android:layout_height="100dp"
             android:background="@drawable/ime_stop_button_background"
             android:clickable="true"
-            android:contentDescription="@string/ime_mic_stop"
+            android:contentDescription="@string/ime_toggle_listen"
             android:focusable="true">
 
             <dev.erik.voiceinput.VoiceLevelCircleView
@@ -116,21 +128,22 @@
                 android:focusable="false" />
         </FrameLayout>
 
+        <!-- Done → STT (or retry on failure) -->
         <FrameLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1">
 
             <ImageButton
-                android:id="@+id/pause_resume"
+                android:id="@+id/done"
                 android:layout_width="52dp"
                 android:layout_height="52dp"
                 android:layout_gravity="center"
                 android:background="@drawable/ime_stop_button_background"
-                android:contentDescription="@string/ime_pause"
+                android:contentDescription="@string/ime_done"
                 android:padding="14dp"
                 android:scaleType="centerInside"
-                android:src="@drawable/ic_ime_pause"
+                android:src="@drawable/ic_ime_done"
                 app:tint="@color/ime_status_text" />
 
             <ImageButton

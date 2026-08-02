@@ -19,8 +19,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Voice keyboard: listen → process → insert text.
- * Keep-worthy takes are always finalized to History (see docs/FEATURE_DESIGN.md).
+ * Voice keyboard UX:
+ * - Center orb: start / pause / resume listen
+ * - ✓ : finish take → STT + insert
+ * - ↵ : new line / paragraph in the field
+ * - ⌨️ : switch to typing keyboard
+ * After success (default): ready at 0:00 paused — user starts when ready.
  */
 class GrokVoiceInputMethodService : InputMethodService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -32,7 +36,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
     private var hintView: TextView? = null
     private var voiceCircle: VoiceLevelCircleView? = null
     private var retryButton: ImageButton? = null
-    private var pauseResumeButton: ImageButton? = null
+    private var doneButton: ImageButton? = null
+    private var newlineButton: ImageButton? = null
     private var openAppButton: ImageButton? = null
     private var processProgress: ProgressBar? = null
     private var transcribing = false
@@ -53,6 +58,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
     private var processStartedAt = 0L
     private var progressDisplay = 0f
     private var tipHideAt = 0L
+    /** Waiting for user to start next take (0:00, mic off). */
+    private var readyForNextTake = false
 
     private val listenTicker =
         object : Runnable {
@@ -173,7 +180,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
 
     /**
      * After hide/back the view may still be inflated but the mic is stopped.
-     * Always put the user into a clean Listening state when the panel is shown again.
+     * First open: start listening. After a finished take (keep-IME): stay ready until user taps.
      */
     private fun ensureFreshListenSession() {
         if (transcribing) {
@@ -181,10 +188,14 @@ class GrokVoiceInputMethodService : InputMethodService() {
             return
         }
         if (recorder.isRecording()) {
-            // Already live (rare race) — keep ticker going.
             mainHandler.removeCallbacks(listenTicker)
             mainHandler.post(listenTicker)
             updateListenUi()
+            return
+        }
+        if (readyForNextTake) {
+            DiagLog.i("ime", "ensure session: stay ready (paused 0:00)")
+            enterReadyState(showTip = false)
             return
         }
         DiagLog.i("ime", "ensure session: start fresh listen")
@@ -208,7 +219,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
         hintView = view.findViewById(R.id.hint)
         voiceCircle = view.findViewById(R.id.voice_circle)
         retryButton = view.findViewById(R.id.retry)
-        pauseResumeButton = view.findViewById(R.id.pause_resume)
+        doneButton = view.findViewById(R.id.done)
+        newlineButton = view.findViewById(R.id.newline)
         openAppButton = view.findViewById(R.id.open_app)
         processProgress = view.findViewById(R.id.process_progress)
         showDebug = Prefs.isImeDebugOverlay(this)
@@ -216,18 +228,37 @@ class GrokVoiceInputMethodService : InputMethodService() {
         hideProgress()
         clearHint()
 
-        view.findViewById<ImageButton>(R.id.cancel).setOnClickListener {
-            DiagLog.ui("cancel_tap")
+        view.findViewById<ImageButton>(R.id.switch_keyboard).setOnClickListener {
+            DiagLog.ui("switch_keyboard_tap")
             cancelAndReturnToKeyboard()
         }
 
-        view.findViewById<View>(R.id.stop_button).setOnClickListener {
+        // Center orb: start / pause / resume (not finish).
+        view.findViewById<View>(R.id.orb_button).setOnClickListener {
             DiagLog.ui(
-                "stop_tap",
+                "orb_tap",
                 "transcribing" to transcribing,
+                "ready" to readyForNextTake,
                 "paused" to recorder.isPaused(),
-                "hasFailed" to (lastFailedClip != null),
                 "recording" to recorder.isRecording(),
+            )
+            when {
+                transcribing -> Unit
+                lastFailedClip != null -> retryTranscription()
+                readyForNextTake || !recorder.isRecording() -> {
+                    readyForNextTake = false
+                    startRecordingSafely()
+                }
+                recorder.isPaused() -> togglePauseResume()
+                else -> togglePauseResume() // listening → pause
+            }
+        }
+
+        doneButton?.setOnClickListener {
+            DiagLog.ui(
+                "done_tap",
+                "recording" to recorder.isRecording(),
+                "paused" to recorder.isPaused(),
             )
             when {
                 transcribing -> Unit
@@ -236,9 +267,9 @@ class GrokVoiceInputMethodService : InputMethodService() {
             }
         }
 
-        pauseResumeButton?.setOnClickListener {
-            DiagLog.ui("pause_resume_tap", "paused" to recorder.isPaused())
-            togglePauseResume()
+        newlineButton?.setOnClickListener {
+            DiagLog.ui("newline_tap")
+            insertNewline()
         }
 
         retryButton?.setOnClickListener {
@@ -257,6 +288,13 @@ class GrokVoiceInputMethodService : InputMethodService() {
             Toast.makeText(this, snap.take(120), Toast.LENGTH_LONG).show()
             true
         }
+    }
+
+    private fun insertNewline() {
+        if (transcribing) return
+        val connection = currentInputConnection ?: return
+        // One enter = new line; double-tap quickly still works for blank paragraph.
+        connection.commitText("\n", 1)
     }
 
     private fun fallbackView(error: Exception): View {
@@ -288,6 +326,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
         transcribeJob?.cancel()
         mainHandler.removeCallbacks(processTicker)
         transcribing = false
+        readyForNextTake = false
         endingSession = false
         lastFailedClip = null
         lastSessionId = null
@@ -295,7 +334,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
         pausedAccumMs = 0L
         pauseStartedAt = 0L
         hideRetry()
-        showPauseControl()
+        showDoneButton()
         hideProgress()
         progressDisplay = 0f
         voiceCircle?.resetProgress()
@@ -328,6 +367,32 @@ class GrokVoiceInputMethodService : InputMethodService() {
         updateListenUi()
     }
 
+    /** Idle ready: 0:00, mic off — user taps orb when they want to speak. */
+    private fun enterReadyState(showTip: Boolean) {
+        readyForNextTake = true
+        transcribing = false
+        endingSession = false
+        lastFailedClip = null
+        lastSessionId = null
+        pausedAccumMs = 0L
+        pauseStartedAt = 0L
+        listenStartedAt = 0L
+        mainHandler.removeCallbacks(listenTicker)
+        mainHandler.removeCallbacks(processTicker)
+        hideProgress()
+        progressDisplay = 0f
+        voiceCircle?.resetProgress()
+        voiceCircle?.setMode(VoiceLevelCircleView.Mode.PAUSED)
+        hideRetry()
+        showDoneButton()
+        setStatus(formatTimer(0L))
+        if (showTip) {
+            showHint(R.string.ime_tip_ready, hideAfterMs = 2800L)
+        } else {
+            clearHint()
+        }
+    }
+
     private fun togglePauseResume() {
         if (transcribing || !recorder.isRecording() || lastFailedClip != null) return
         if (recorder.isPaused()) {
@@ -337,16 +402,11 @@ class GrokVoiceInputMethodService : InputMethodService() {
             }
             recorder.resume()
             voiceCircle?.setMode(VoiceLevelCircleView.Mode.RECORDING)
-            pauseResumeButton?.setImageResource(R.drawable.ic_ime_pause)
-            pauseResumeButton?.contentDescription = getString(R.string.ime_pause)
             clearHint()
         } else {
             recorder.pause()
             pauseStartedAt = System.currentTimeMillis()
             voiceCircle?.setMode(VoiceLevelCircleView.Mode.PAUSED)
-            pauseResumeButton?.setImageResource(R.drawable.ic_ime_play)
-            pauseResumeButton?.contentDescription = getString(R.string.ime_resume)
-            // Same reserved hint row — INVISIBLE↔VISIBLE text only, no height jump.
             showHint(R.string.ime_hint_paused, hideAfterMs = 1600L)
         }
         updateListenUi()
@@ -550,8 +610,9 @@ class GrokVoiceInputMethodService : InputMethodService() {
         transcribeJob?.cancel()
         transcribing = true
         hideRetry()
-        hidePauseControl()
+        hideDoneButton()
         clearHint()
+        readyForNextTake = false
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.TRANSCRIBING)
         val uploadBytes = clip.encodedUpload?.bytes?.size ?: (clip.pcm.size / 5)
         processEstimateMs =
@@ -600,8 +661,6 @@ class GrokVoiceInputMethodService : InputMethodService() {
                         withContext(Dispatchers.IO) { store.markOk(sessionId, text) }
                     }
                     mainHandler.removeCallbacks(processTicker)
-                    progressDisplay = 1f
-                    voiceCircle?.completeProgress()
                     updatePhaseOverlay("Insert text… total=${totalMs}ms")
                     val connection = currentInputConnection
                     if (connection == null) {
@@ -614,6 +673,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
                         return@launch
                     }
                     val commitStart = System.nanoTime()
+                    // Trailing space so the next take doesn't glue onto the last word.
                     connection.commitText("$text ", 1)
                     val commitMs = (System.nanoTime() - commitStart) / 1_000_000L
                     DiagLog.i("ime", "commitText", "ms" to commitMs, "chars" to text.length)
@@ -667,7 +727,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
         mainHandler.removeCallbacks(listenTicker)
         mainHandler.removeCallbacks(processTicker)
         hideProgress()
-        hidePauseControl()
+        hideDoneButton()
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.IDLE)
         setStatus(message)
         if (showDebug) {
@@ -678,22 +738,20 @@ class GrokVoiceInputMethodService : InputMethodService() {
 
     private fun showRetry() {
         retryButton?.visibility = View.VISIBLE
-        pauseResumeButton?.visibility = View.GONE
+        doneButton?.visibility = View.GONE
     }
 
     private fun hideRetry() {
         retryButton?.visibility = View.GONE
-        if (!transcribing) showPauseControl()
+        if (!transcribing) showDoneButton()
     }
 
-    private fun showPauseControl() {
-        pauseResumeButton?.visibility = View.VISIBLE
-        pauseResumeButton?.setImageResource(R.drawable.ic_ime_pause)
-        pauseResumeButton?.contentDescription = getString(R.string.ime_pause)
+    private fun showDoneButton() {
+        doneButton?.visibility = View.VISIBLE
     }
 
-    private fun hidePauseControl() {
-        pauseResumeButton?.visibility = View.GONE
+    private fun hideDoneButton() {
+        doneButton?.visibility = View.GONE
     }
 
     private fun hideProgress() {
@@ -703,8 +761,9 @@ class GrokVoiceInputMethodService : InputMethodService() {
     }
 
     /**
-     * After text is inserted: either stay on voice IME for another take, or return
-     * to the previous (typing) keyboard — controlled by Settings.
+     * After text is inserted: either stay ready for another take (paused 0:00),
+     * or return to the typing keyboard — Settings switch (default: stay).
+     * Do not force progress to 100% — just leave processing UI.
      */
     private fun afterSuccessfulInsert() {
         transcribing = false
@@ -712,17 +771,11 @@ class GrokVoiceInputMethodService : InputMethodService() {
         lastSessionId = null
         endingSession = false
         mainHandler.removeCallbacks(processTicker)
+        // Drop processing ring as-is (even at 90%); no snap to 100%.
         if (Prefs.isKeepImeAfterStt(this)) {
-            DiagLog.ui("after_insert", "keepIme" to true)
-            // Brief beat at full ring, then fresh listen (no layout jump).
-            mainHandler.postDelayed(
-                {
-                    if (!isInputViewShown) return@postDelayed
-                    hideProgress()
-                    startRecordingSafely()
-                },
-                180L,
-            )
+            DiagLog.ui("after_insert", "keepIme" to true, "mode" to "ready")
+            if (!isInputViewShown) return
+            enterReadyState(showTip = true)
         } else {
             DiagLog.ui("after_insert", "keepIme" to false)
             returnToKeyboard(cancelJob = true)

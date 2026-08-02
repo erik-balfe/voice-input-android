@@ -18,16 +18,14 @@ class VoiceImeLayoutTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val view = LayoutInflater.from(context).inflate(R.layout.voice_input_ime, null)
         assertNotNull(view.findViewById<VoiceLevelCircleView>(R.id.voice_circle))
-        assertNotNull(view.findViewById(R.id.stop_button))
-        assertNotNull(view.findViewById(R.id.cancel))
-        assertNotNull(view.findViewById(R.id.debug_detail))
+        assertNotNull(view.findViewById(R.id.orb_button))
+        assertNotNull(view.findViewById(R.id.done))
+        assertNotNull(view.findViewById(R.id.newline))
+        assertNotNull(view.findViewById(R.id.switch_keyboard))
         assertNotNull(view.findViewById(R.id.status))
         assertNotNull(view.findViewById(R.id.open_app))
-        assertNotNull(view.findViewById(R.id.retry))
-        assertNotNull(view.findViewById(R.id.pause_resume))
         val hint = view.findViewById<View>(R.id.hint)
         assertNotNull(hint)
-        // Fixed-height hint: INVISIBLE by default so pause tips don't resize panel.
         assertTrue(
             hint.visibility == View.INVISIBLE || hint.visibility == View.VISIBLE,
         )

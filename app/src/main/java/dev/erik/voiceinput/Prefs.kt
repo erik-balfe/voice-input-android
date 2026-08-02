@@ -129,7 +129,8 @@ object Prefs {
      * When false (default), switch back to the previous keyboard after insert.
      */
     fun isKeepImeAfterStt(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_KEEP_IME_AFTER_STT, false)
+        // Default on: multi-take dictation is the normal voice-keyboard loop.
+        prefs(context).getBoolean(KEY_KEEP_IME_AFTER_STT, true)
 
     fun setKeepImeAfterStt(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_KEEP_IME_AFTER_STT, enabled).apply()
