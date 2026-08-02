@@ -18,6 +18,10 @@ class VoiceImeLayoutTest {
         assertNotNull(view.findViewById<VoiceLevelCircleView>(R.id.voice_circle))
         assertNotNull(view.findViewById(R.id.stop_button))
         assertNotNull(view.findViewById(R.id.cancel))
+        assertNotNull(view.findViewById(R.id.debug_detail))
+        assertNotNull(view.findViewById(R.id.status))
+        assertNotNull(view.findViewById(R.id.open_app))
+        assertNotNull(view.findViewById(R.id.retry))
     }
 
     @Test
