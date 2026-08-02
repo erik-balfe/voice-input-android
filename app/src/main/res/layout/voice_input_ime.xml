@@ -20,12 +20,12 @@
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_gravity="start|center_vertical"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/ime_top_icon_background"
             android:contentDescription="@string/ime_switch_keyboard"
             android:padding="8dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_ime_keyboard"
-            app:tint="@color/ime_status_text" />
+            app:tint="@color/ime_top_icon" />
 
         <TextView
             android:id="@+id/status"
@@ -34,6 +34,9 @@
             android:layout_gravity="center"
             android:gravity="center"
             android:minWidth="64dp"
+            android:maxWidth="200dp"
+            android:maxLines="2"
+            android:ellipsize="end"
             android:text="0:00"
             android:textColor="@color/ime_status_text"
             android:textSize="18sp"
@@ -46,12 +49,12 @@
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_gravity="end|center_vertical"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/ime_top_icon_background"
             android:contentDescription="@string/ime_open_settings"
             android:padding="8dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_ime_settings"
-            app:tint="@color/ime_status_text" />
+            app:tint="@color/ime_top_icon" />
     </FrameLayout>
 
     <TextView

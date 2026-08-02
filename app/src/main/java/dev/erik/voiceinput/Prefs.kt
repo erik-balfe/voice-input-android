@@ -1,6 +1,7 @@
 package dev.erik.voiceinput
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -23,14 +24,30 @@ object Prefs {
     private const val KEY_HISTORY_MAX_BYTES = "history_max_bytes"
     private const val KEY_KEEP_IME_AFTER_STT = "keep_ime_after_stt"
 
-    private fun prefs(context: Context) =
-        EncryptedSharedPreferences.create(
-            context,
-            FILE,
-            MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
+    @Volatile
+    private var cached: SharedPreferences? = null
+
+    /**
+     * Cache EncryptedSharedPreferences — creating MasterKey + ESP on every call
+     * freezes the UI for hundreds of ms (visible when flipping OAuth/API radio).
+     */
+    private fun prefs(context: Context): SharedPreferences {
+        cached?.let { return it }
+        synchronized(this) {
+            cached?.let { return it }
+            val app = context.applicationContext
+            val created =
+                EncryptedSharedPreferences.create(
+                    app,
+                    FILE,
+                    MasterKey.Builder(app).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+                )
+            cached = created
+            return created
+        }
+    }
 
     fun getApiKey(context: Context): String? =
         prefs(context).getString(KEY_API, null)?.takeIf { it.isNotBlank() }

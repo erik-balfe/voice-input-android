@@ -339,16 +339,18 @@ class GrokVoiceInputMethodService : InputMethodService() {
         pauseStartedAt = 0L
         hideRetry()
         showDoneButton()
+        newlineButton?.visibility = View.VISIBLE
+        openAppButton?.scaleX = 1f
+        openAppButton?.scaleY = 1f
         hideProgress()
         progressDisplay = 0f
         voiceCircle?.resetProgress()
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.RECORDING)
-        showTipBriefly()
         setStatus(formatTimer(0L))
 
         if (!XaiOauth.hasAnyAuth(this)) {
             DiagLog.w("ime", "missing auth")
-            showIdleError(getString(R.string.auth_missing))
+            showNeedsAuth()
             return
         }
 
@@ -367,9 +369,29 @@ class GrokVoiceInputMethodService : InputMethodService() {
         }
         listenStartedAt = System.currentTimeMillis()
         updateDoneHighlight(emphasized = true)
+        // First tip: center = pause; later pause tip covers ✓ = transcribe.
+        showHint(R.string.ime_hint_listening, hideAfterMs = 2800L)
         mainHandler.removeCallbacks(listenTicker)
         mainHandler.post(listenTicker)
         updateListenUi()
+    }
+
+    /** Clean fixed-size panel when user has not signed in yet. */
+    private fun showNeedsAuth() {
+        readyForNextTake = false
+        transcribing = false
+        mainHandler.removeCallbacks(listenTicker)
+        mainHandler.removeCallbacks(processTicker)
+        hideProgress()
+        hideDoneButton()
+        newlineButton?.visibility = View.INVISIBLE
+        voiceCircle?.setMode(VoiceLevelCircleView.Mode.IDLE)
+        setStatus(getString(R.string.ime_auth_title))
+        showHint(R.string.ime_auth_hint, hideAfterMs = 0L)
+        // Make settings the obvious next step (always visible top-right).
+        openAppButton?.alpha = 1f
+        openAppButton?.scaleX = 1.08f
+        openAppButton?.scaleY = 1.08f
     }
 
     /** Idle ready: 0:00, mic off — user taps orb when they want to speak. */
@@ -390,6 +412,9 @@ class GrokVoiceInputMethodService : InputMethodService() {
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.PAUSED)
         hideRetry()
         showDoneButton()
+        newlineButton?.visibility = View.VISIBLE
+        openAppButton?.scaleX = 1f
+        openAppButton?.scaleY = 1f
         updateDoneHighlight(emphasized = false)
         setStatus(formatTimer(0L))
         if (showTip) {
@@ -456,7 +481,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
     }
 
     private fun showTipBriefly() {
-        showHint(R.string.ime_tip_speak, hideAfterMs = 2200L)
+        // Listening tip is set from startRecording after mic opens.
     }
 
     private fun showHint(resId: Int, hideAfterMs: Long = 0L) {

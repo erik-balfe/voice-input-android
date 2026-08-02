@@ -3,9 +3,11 @@
     <!-- Voice keyboard — dark theme (follows device night mode) -->
     <color name="ime_background">#2B2B2F</color>
     <color name="ime_panel_border">#5F6368</color>
-    <color name="ime_status_text">#F1F3F4</color>
-    <color name="ime_debug_text">#9AA0A6</color>
-    <color name="ime_cancel_icon">#F1F3F4</color>
+    <color name="ime_status_text">#FFFFFF</color>
+    <color name="ime_top_icon">#FFFFFF</color>
+    <color name="ime_debug_text">#BDC1C6</color>
+    <color name="ime_cancel_icon">#FFFFFF</color>
+    <color name="ime_top_icon_bg">#4A4E54</color>
     <color name="ime_voice_active">#A8C7FA</color>
     <color name="ime_voice_active_soft">#669DF6</color>
     <color name="ime_voice_silent">#9AA0A6</color>
@@ -14,7 +16,7 @@
     <color name="ime_voice_paused">#FDD663</color>
     <color name="ime_progress_track">#5F6368</color>
     <color name="ime_progress">#A8C7FA</color>
-    <color name="ime_hint_text">#9AA0A6</color>
+    <color name="ime_hint_text">#E8EAED</color>
     <color name="ime_stop_button_bg">#3C4043</color>
     <color name="ime_done_highlight_fill">#0D3B1E</color>
     <color name="ime_done_highlight_stroke">#81C995</color>
