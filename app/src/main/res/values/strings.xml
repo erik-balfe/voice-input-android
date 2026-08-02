@@ -115,6 +115,9 @@
     <string name="oauth_sign_out">Sign out of xAI</string>
     <string name="oauth_waiting">Waiting for approval… code %1$s</string>
     <string name="oauth_open_browser">Browser opened — approve the login, then return here</string>
+    <string name="oauth_copy_link">Copy sign-in link</string>
+    <string name="oauth_link_copied">Sign-in link copied — open it on any device and approve</string>
+    <string name="oauth_code_hint">Code: %1$s (if the link asks for a code)</string>
     <string name="oauth_success">Signed in — STT set to OAuth (subscription quota)</string>
     <string name="oauth_failed">Sign-in failed: %1$s</string>
     <string name="oauth_cancel">Cancel sign-in</string>

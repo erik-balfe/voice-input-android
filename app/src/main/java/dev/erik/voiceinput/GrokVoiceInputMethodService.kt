@@ -369,8 +369,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
         }
         listenStartedAt = System.currentTimeMillis()
         updateDoneHighlight(emphasized = true)
-        // First tip: center = pause; later pause tip covers ✓ = transcribe.
-        showHint(R.string.ime_hint_listening, hideAfterMs = 2800L)
+        // Keep tip visible while listening so the pause control stays obvious.
+        showHint(R.string.ime_hint_listening, hideAfterMs = 0L)
         mainHandler.removeCallbacks(listenTicker)
         mainHandler.post(listenTicker)
         updateListenUi()
@@ -418,7 +418,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
         updateDoneHighlight(emphasized = false)
         setStatus(formatTimer(0L))
         if (showTip) {
-            showHint(R.string.ime_tip_ready, hideAfterMs = 2800L)
+            // Stay visible until next action — looking for the next control.
+            showHint(R.string.ime_tip_ready, hideAfterMs = 0L)
         } else {
             clearHint()
         }
@@ -433,14 +434,15 @@ class GrokVoiceInputMethodService : InputMethodService() {
             }
             recorder.resume()
             voiceCircle?.setMode(VoiceLevelCircleView.Mode.RECORDING)
-            clearHint()
+            showHint(R.string.ime_hint_listening, hideAfterMs = 0L)
             // Still recording (paused mid-take) — keep ✓ emphasized.
             updateDoneHighlight(emphasized = true)
         } else {
             recorder.pause()
             pauseStartedAt = System.currentTimeMillis()
             voiceCircle?.setMode(VoiceLevelCircleView.Mode.PAUSED)
-            showHint(R.string.ime_hint_tap_done, hideAfterMs = 2500L)
+            // Always show while paused — user is thinking and looking for ✓.
+            showHint(R.string.ime_hint_tap_done, hideAfterMs = 0L)
             updateDoneHighlight(emphasized = true)
         }
         updateListenUi()
@@ -498,12 +500,16 @@ class GrokVoiceInputMethodService : InputMethodService() {
     }
 
     private fun maybeHideTip() {
+        // Optional timed tips only (auth / one-shots). Listening & paused tips stay up.
         if (tipHideAt > 0L && System.currentTimeMillis() >= tipHideAt) {
             tipHideAt = 0L
-            if (!recorder.isPaused()) {
-                clearHint()
+            if (recorder.isRecording() && recorder.isPaused()) {
+                showHint(R.string.ime_hint_tap_done, hideAfterMs = 0L)
+            } else if (recorder.isRecording()) {
+                showHint(R.string.ime_hint_listening, hideAfterMs = 0L)
+            } else if (readyForNextTake) {
+                showHint(R.string.ime_tip_ready, hideAfterMs = 0L)
             } else {
-                // Clear pause label after timeout without collapsing layout.
                 clearHint()
             }
         }

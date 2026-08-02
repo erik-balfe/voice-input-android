@@ -1,6 +1,9 @@
 package dev.erik.voiceinput
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -84,6 +87,8 @@ class SettingsActivity : ComponentActivity() {
             var keepIme by remember { mutableStateOf(Prefs.isKeepImeAfterStt(this)) }
             var loginStatus by remember { mutableStateOf("") }
             var loginInProgress by remember { mutableStateOf(false) }
+            var oauthVerifyUrl by remember { mutableStateOf<String?>(null) }
+            var oauthUserCode by remember { mutableStateOf<String?>(null) }
             var probeOk by remember { mutableStateOf<Boolean?>(null) }
             var probeMessage by remember { mutableStateOf("") }
             var probeRunning by remember { mutableStateOf(false) }
@@ -180,6 +185,8 @@ class SettingsActivity : ComponentActivity() {
                                     onClick = {
                                         loginInProgress = true
                                         loginStatus = getString(R.string.oauth_busy)
+                                        oauthVerifyUrl = null
+                                        oauthUserCode = null
                                         loginJob?.cancel()
                                         loginJob =
                                             scope.launch {
@@ -188,6 +195,8 @@ class SettingsActivity : ComponentActivity() {
                                                         withContext(Dispatchers.IO) {
                                                             XaiOauth.startDeviceCode()
                                                         }
+                                                    oauthVerifyUrl = start.verificationUri
+                                                    oauthUserCode = start.userCode
                                                     loginStatus =
                                                         getString(
                                                             R.string.oauth_waiting,
@@ -204,6 +213,8 @@ class SettingsActivity : ComponentActivity() {
                                                         )
                                                     }
                                                     loginStatus = ""
+                                                    oauthVerifyUrl = null
+                                                    oauthUserCode = null
                                                     refreshAuthUi()
                                                     snackbar.showSnackbar(
                                                         getString(R.string.oauth_success),
@@ -214,6 +225,7 @@ class SettingsActivity : ComponentActivity() {
                                                             R.string.oauth_failed,
                                                             e.message ?: "error",
                                                         )
+                                                    // Keep link if flow failed after code started.
                                                 } finally {
                                                     loginInProgress = false
                                                 }
@@ -221,6 +233,43 @@ class SettingsActivity : ComponentActivity() {
                                     },
                                 ) {
                                     Text(stringResource(R.string.oauth_sign_in))
+                                }
+                                // Secondary: share/copy link so someone else can approve (family quota).
+                                if (oauthVerifyUrl != null) {
+                                    TextButton(
+                                        onClick = {
+                                            val url = oauthVerifyUrl ?: return@TextButton
+                                            val cm =
+                                                getSystemService(Context.CLIPBOARD_SERVICE)
+                                                    as ClipboardManager
+                                            cm.setPrimaryClip(
+                                                ClipData.newPlainText("xAI sign-in", url),
+                                            )
+                                            scope.launch {
+                                                snackbar.showSnackbar(
+                                                    getString(R.string.oauth_link_copied),
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.oauth_copy_link),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                    if (!oauthUserCode.isNullOrBlank()) {
+                                        Text(
+                                            text =
+                                                stringResource(
+                                                    R.string.oauth_code_hint,
+                                                    oauthUserCode ?: "",
+                                                ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             } else {
                                 OutlinedButton(
@@ -230,6 +279,8 @@ class SettingsActivity : ComponentActivity() {
                                         refreshAuthUi()
                                         probeOk = null
                                         probeMessage = ""
+                                        oauthVerifyUrl = null
+                                        oauthUserCode = null
                                     },
                                 ) {
                                     Text(stringResource(R.string.oauth_sign_out))
