@@ -51,13 +51,16 @@ class GrokVoiceInputMethodService : InputMethodService() {
     private var endingSession = false
     private var processEstimateMs = 2500L
     private var processStartedAt = 0L
+    private var progressDisplay = 0f
+    private var tipHideAt = 0L
 
     private val listenTicker =
         object : Runnable {
             override fun run() {
                 if (!recorder.isRecording() || transcribing) return
                 updateListenUi()
-                mainHandler.postDelayed(this, 200)
+                maybeHideTip()
+                mainHandler.postDelayed(this, 50)
             }
         }
 
@@ -66,13 +69,19 @@ class GrokVoiceInputMethodService : InputMethodService() {
             override fun run() {
                 if (!transcribing) return
                 val elapsed = System.currentTimeMillis() - processStartedAt
-                val frac = ProcessingProgress.fractionElapsed(elapsed, processEstimateMs)
-                val pct = (frac * 100).toInt().coerceIn(0, 99)
-                processProgress?.progress = (frac * 1000).toInt().coerceIn(0, 920)
+                progressDisplay =
+                    ProcessingProgress.smoothToward(
+                        display = progressDisplay,
+                        elapsedMs = elapsed,
+                        estimateTotalMs = processEstimateMs,
+                    )
+                voiceCircle?.setProgress(progressDisplay)
+                val pct = (progressDisplay * 100).toInt().coerceIn(0, 99)
                 if (!showDebug) {
                     setStatus(getString(R.string.ime_processing_pct, pct))
                 }
-                mainHandler.postDelayed(this, 100)
+                // ~60fps-ish for smooth ring
+                mainHandler.postDelayed(this, 16)
             }
         }
 
@@ -209,7 +218,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
         showDebug = Prefs.isImeDebugOverlay(this)
         debugDetail?.visibility = if (showDebug) View.VISIBLE else View.GONE
         hideProgress()
-        setHint(R.string.ime_hint_listening)
+        hintView?.visibility = View.GONE
 
         view.findViewById<ImageButton>(R.id.cancel).setOnClickListener {
             DiagLog.ui("cancel_tap")
@@ -292,9 +301,11 @@ class GrokVoiceInputMethodService : InputMethodService() {
         hideRetry()
         showPauseControl()
         hideProgress()
+        progressDisplay = 0f
+        voiceCircle?.resetProgress()
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.RECORDING)
-        setHint(R.string.ime_hint_listening)
-        setStatus(getString(R.string.ime_listening))
+        showTipBriefly()
+        setStatus(formatTimer(0L))
 
         if (!XaiOauth.hasAnyAuth(this)) {
             DiagLog.w("ime", "missing auth")
@@ -332,14 +343,17 @@ class GrokVoiceInputMethodService : InputMethodService() {
             voiceCircle?.setMode(VoiceLevelCircleView.Mode.RECORDING)
             pauseResumeButton?.setImageResource(R.drawable.ic_ime_pause)
             pauseResumeButton?.contentDescription = getString(R.string.ime_pause)
-            setHint(R.string.ime_hint_listening)
+            hintView?.visibility = View.GONE
         } else {
             recorder.pause()
             pauseStartedAt = System.currentTimeMillis()
             voiceCircle?.setMode(VoiceLevelCircleView.Mode.PAUSED)
             pauseResumeButton?.setImageResource(R.drawable.ic_ime_play)
             pauseResumeButton?.contentDescription = getString(R.string.ime_resume)
-            setHint(R.string.ime_hint_paused)
+            // Brief pause label only
+            hintView?.setText(R.string.ime_hint_paused)
+            hintView?.visibility = View.VISIBLE
+            tipHideAt = System.currentTimeMillis() + 1500L
         }
         updateListenUi()
     }
@@ -350,16 +364,32 @@ class GrokVoiceInputMethodService : InputMethodService() {
         return (now - listenStartedAt - pausedAccumMs - pausedExtra).coerceAtLeast(0L)
     }
 
-    private fun updateListenUi() {
-        val sec = activeListenMs() / 1000.0
-        val mm = (sec.toLong() / 60)
-        val ss = (sec.toLong() % 60)
-        if (recorder.isPaused()) {
-            setStatus(getString(R.string.ime_paused_duration, mm, ss))
-        } else {
-            setStatus(getString(R.string.ime_listening_duration, mm, ss))
+    private fun formatTimer(ms: Long): String {
+        val sec = (ms / 1000L).coerceAtLeast(0L)
+        val mm = sec / 60
+        val ss = sec % 60
+        return getString(R.string.ime_timer, mm.toInt(), ss.toInt())
+    }
+
+    private fun showTipBriefly() {
+        hintView?.setText(R.string.ime_tip_speak)
+        hintView?.visibility = View.VISIBLE
+        tipHideAt = System.currentTimeMillis() + 2200L
+    }
+
+    private fun maybeHideTip() {
+        if (tipHideAt > 0L && System.currentTimeMillis() >= tipHideAt) {
+            tipHideAt = 0L
+            if (!recorder.isPaused()) {
+                hintView?.visibility = View.GONE
+            }
         }
+    }
+
+    private fun updateListenUi() {
+        setStatus(formatTimer(activeListenMs()))
         if (!showDebug) return
+        val sec = activeListenMs() / 1000.0
         val line =
             buildString {
                 append("sid=").append(DiagLog.currentSessionId())
@@ -427,14 +457,15 @@ class GrokVoiceInputMethodService : InputMethodService() {
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.IDLE)
         hideProgress()
         hideRetry()
-        setHint(R.string.ime_hint_saved_hidden)
+        hintView?.setText(R.string.ime_hint_saved_hidden)
+        hintView?.visibility = View.VISIBLE
         if (meta != null) {
             setStatus(getString(R.string.ime_saved_to_history))
             if (notify) {
                 Toast.makeText(this, R.string.ime_saved_to_history, Toast.LENGTH_SHORT).show()
             }
         } else {
-            setStatus(getString(R.string.ime_listening))
+            setStatus(formatTimer(0L))
         }
     }
 
@@ -512,8 +543,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
         transcribing = true
         hideRetry()
         hidePauseControl()
+        hintView?.visibility = View.GONE
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.TRANSCRIBING)
-        setHint(R.string.ime_hint_processing)
         val uploadBytes = clip.encodedUpload?.bytes?.size ?: (clip.pcm.size / 5)
         processEstimateMs =
             ProcessingProgress.estimateTotalMs(
@@ -522,7 +553,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
                 authLikelyCached = true,
             )
         processStartedAt = System.currentTimeMillis()
-        showProgress()
+        progressDisplay = 0f
+        voiceCircle?.resetProgress()
         setStatus(getString(R.string.ime_processing_pct, 0))
         phaseLine = "Processing…"
         updatePhaseOverlay("Processing…")
@@ -559,7 +591,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
                         withContext(Dispatchers.IO) { store.markOk(sessionId, text) }
                     }
                     mainHandler.removeCallbacks(processTicker)
-                    processProgress?.progress = 1000
+                    progressDisplay = 1f
+                    voiceCircle?.setProgress(1f)
                     updatePhaseOverlay("Insert text… total=${totalMs}ms")
                     val connection = currentInputConnection
                     if (connection == null) {
@@ -620,14 +653,9 @@ class GrokVoiceInputMethodService : InputMethodService() {
         lastFailedClip = clip
         lastSessionId = sessionId
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.IDLE)
-        setHint(R.string.ime_hint_failed)
-        val withHint =
-            if (sessionId != null) {
-                "$message\n${getString(R.string.ime_failed_saved_hint)}"
-            } else {
-                message
-            }
-        setStatus(withHint)
+        hintView?.setText(R.string.ime_hint_failed)
+        hintView?.visibility = View.VISIBLE
+        setStatus(message)
         if (showDebug) {
             debugDetail?.text =
                 "ERROR sid=${DiagLog.currentSessionId()}\nsr=${clip.sampleRate}\n$message\n${DiagLog.lastDetailOnly()}"
@@ -668,19 +696,10 @@ class GrokVoiceInputMethodService : InputMethodService() {
         pauseResumeButton?.visibility = View.GONE
     }
 
-    private fun showProgress() {
-        processProgress?.visibility = View.VISIBLE
-        processProgress?.progress = 0
-    }
-
     private fun hideProgress() {
         processProgress?.visibility = View.GONE
-        processProgress?.progress = 0
-    }
-
-    private fun setHint(resId: Int) {
-        hintView?.setText(resId)
-        hintView?.visibility = View.VISIBLE
+        progressDisplay = 0f
+        voiceCircle?.resetProgress()
     }
 
     private fun returnToKeyboard(cancelJob: Boolean = true) {

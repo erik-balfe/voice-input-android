@@ -4,8 +4,8 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- External-link / open app affordance -->
+    <!-- Simple list / history icon — same filled style as pause/cancel -->
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M14,3h7v7h-2V6.41l-9.29,9.3l-1.42,-1.42L17.59,5H14V3zM5,5h6v2H7v10h10v-4h2v6H5V5z" />
+        android:fillColor="#FF000000"
+        android:pathData="M4,6h16v2H4V6zM4,11h16v2H4v-2zM4,16h10v2H4v-2z" />
 </vector>
