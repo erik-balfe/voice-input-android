@@ -1,33 +1,24 @@
 # Project state
 
 Last updated: 2026-08-03  
-Version: **0.3.2** (cleanup next)
+Version: **0.3.3**  
+VCS: `main` at polished tip (cleanup + polish commits).
 
-## Product status
+## Shipped
 
-Production-ready for everyday dogfooding:
+- Progressive AAC, OAuth / API key, multi-take IME  
+- History via `SessionPersistence` + `RecordingStore` (IME + RecognitionService)  
+- Progress ring, fixed-height IME, product Settings  
+- Pure helpers: `ImeUi`, `ProcessingProgress`, `SessionAudio`  
 
-- Progressive AAC during capture, OAuth SuperGrok / API key
-- IME multi-take (default keep open → ready at 0:00)
-- Controls: ⌨️ typing IME · ↵ newline · orb listen/pause · ✓ transcribe · ⚙ settings
-- History store (M4A + meta, prune caps); also filled from system RecognitionService
-- Progress ring (optimistic, monotonic, never snaps back)
-- Lean Settings (account, test connection, language, keep-IME; Advanced for mic/limits/logs)
+## Deferred
 
-## Deferred (next release candidates)
+- Silence cut (VAD) before upload  
+- Opus progressive encode (optional)  
+- Further IME class split (`SessionCoordinator`) if file grows again  
 
-- Silence cut before upload (VAD; careful false negatives)
-- Optional Opus progressive encode (AAC is fine for STT today)
+## Verify
 
-## Architecture notes
-
-- Product audio on disk: **M4A only** (`RecordingStore`)
-- PCM only in RAM during capture
-- Encrypted prefs **cached** (avoid UI jank)
-- Debug WAV / verbose paths gated; not product defaults
-
-## Docs
-
-- [REQUIREMENTS.md](./REQUIREMENTS.md)
-- [FEATURE_DESIGN.md](./FEATURE_DESIGN.md) (may lag latest IME control map slightly)
-- [PLAN.md](./PLAN.md)
+```bash
+./scripts/check.sh
+```

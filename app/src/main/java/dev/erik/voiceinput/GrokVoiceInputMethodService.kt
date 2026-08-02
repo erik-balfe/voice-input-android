@@ -464,18 +464,15 @@ class GrokVoiceInputMethodService : InputMethodService() {
         }
     }
 
-    private fun activeListenMs(): Long {
-        val now = System.currentTimeMillis()
-        val pausedExtra = if (pauseStartedAt > 0L) now - pauseStartedAt else 0L
-        return (now - listenStartedAt - pausedAccumMs - pausedExtra).coerceAtLeast(0L)
-    }
+    private fun activeListenMs(): Long =
+        ImeUi.activeListenMs(
+            nowMs = System.currentTimeMillis(),
+            listenStartedAtMs = listenStartedAt,
+            pausedAccumMs = pausedAccumMs,
+            pauseStartedAtMs = pauseStartedAt,
+        )
 
-    private fun formatTimer(ms: Long): String {
-        val sec = (ms / 1000L).coerceAtLeast(0L)
-        val mm = sec / 60
-        val ss = sec % 60
-        return getString(R.string.ime_timer, mm.toInt(), ss.toInt())
-    }
+    private fun formatTimer(ms: Long): String = ImeUi.formatTimer(ms)
 
     private fun showHint(resId: Int, hideAfterMs: Long = 0L) {
         hintView?.setText(resId)
@@ -614,33 +611,24 @@ class GrokVoiceInputMethodService : InputMethodService() {
     }
 
     private fun persistClip(clip: PcmClip, status: SessionStatus): RecordingMeta? {
-        val bytes = SessionAudio.m4aBytes(clip) ?: return null
-        val store = RecordingStore.fromContext(this)
-        val pkg = currentInputEditorInfo?.packageName
-        return try {
-            store.save(
-                m4aBytes = bytes,
-                durationMs = clip.durationMs,
+        val meta =
+            SessionPersistence.saveClip(
+                context = this,
+                clip = clip,
                 status = status,
-                language = Prefs.getLanguage(this),
-                sampleRate = clip.sampleRate,
-                sourcePackage = pkg,
-                maxItems = Prefs.getHistoryMaxItems(this),
-                maxBytes = Prefs.getHistoryMaxBytes(this),
-            ).also {
-                DiagLog.i(
-                    "session",
-                    "persisted",
-                    "id" to (it?.id ?: "?"),
-                    "status" to status.wire,
-                    "m4aBytes" to bytes.size,
-                    "durationMs" to clip.durationMs,
-                )
-            }
-        } catch (e: Exception) {
-            DiagLog.e("session", "persist failed", e)
-            null
+                sourcePackage = currentInputEditorInfo?.packageName,
+            )
+        if (meta != null) {
+            DiagLog.i(
+                "session",
+                "persisted",
+                "id" to meta.id,
+                "status" to status.wire,
+                "m4aBytes" to meta.audioBytes,
+                "durationMs" to clip.durationMs,
+            )
         }
+        return meta
     }
 
     private fun retryTranscription() {

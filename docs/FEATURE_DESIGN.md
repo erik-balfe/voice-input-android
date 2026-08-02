@@ -68,40 +68,49 @@ any + STT fail → failed (+ error)
 
 ---
 
-## F3 — Pause / duration / open App (design; pause deferred if needed)
+## F3 — IME controls (shipped 0.3.x)
 
-### UX (target)
+### Layout
+```
+[ ⌨️ typing IME ]     m:ss      [ ⚙ settings ]
+                      hint (always reserved height)
+[ ↵ newline ]      ( living orb )      [ ✓ done ]
+```
+
 | Control | Behavior |
 |---------|----------|
-| Status | `Listening · m:ss` or `Paused · m:ss` or `Processing…` |
-| ⏸ / ▶ | Pause = stop feeding mic, keep session; Resume = continue same take |
-| ↗ App | `SAVE_ONLY` then start `HistoryActivity` |
-| Duration | Always visible while listening/paused (not debug-only) |
+| **Orb (center)** | Ready → start listen; listening → pause; paused mid-take → resume |
+| **✓** | Finish take → STT + insert (green highlight while take active) |
+| **↵** | Insert `\n` into field (paragraph between takes) |
+| **⌨️** | Switch to typing IME (previous/last/next/picker fallbacks) |
+| **⚙** | Open Settings (save take first if recording) |
+| **Timer** | Centered `m:ss` active listen time |
+| **Hints** | Persistent while relevant (pause / transcribe / ready) |
 
-### Architecture (pause — Phase 2 if not in this goal slice)
-- Spike: pause AudioRecord + stop progressive feed; on resume reopen or continue encoder (multi-segment merge if needed).
-- **This goal:** duration on status when listening; optional App button → History; full pause may ship with coordinator hooks reserved.
+### After success
+- Default **keep IME**: enter **ready** at `0:00` mic off (not auto-record).
+- Optional setting: close and switch to typing keyboard.
 
-### Open App
-- `Intent(HistoryActivity)` with `FLAG_ACTIVITY_NEW_TASK` from IME.
-- Before launch: end session with `SAVE_ONLY` if recording.
+### Architecture
+- Pause drains AudioRecord without feeding progressive AAC; resume continues same encoder.
+- `SessionPersistence.saveClip` shared with RecognitionService.
+- Hide/back → `SAVE_ONLY` if keep-worthy; next show restarts or stays ready.
 
 ---
 
-## F4 — Processing indicator
+## F4 — Processing indicator (shipped)
 
 ### UX
 | Element | Spec |
 |---------|------|
-| Label | **Processing…** (never “Sending” as primary) |
-| Meter | Switch center control to transcribing/spinner mode (existing `TRANSCRIBING`) |
-| Progress bar | Optional later; estimate from size + throughput (REQUIREMENTS) |
-| Fail | Error string + Retry; audio remains in History as `failed` |
-| Offline | “Network required. Recording saved — open History to process later.” |
+| Timer | Frozen at take duration |
+| Ring | Circular progress on orb; asymptotic ease to ~88% then crawl; never reverse |
+| Done | Drop ring without forcing 100%; go to ready or typing IME |
+| Fail | Message + Retry; audio in History as `failed` |
 
 ### Architecture
-- `onPhase` callbacks stay internal/debug; IME main status stays `Processing…` unless debug overlay.
-- STT result writes `RecordingStore.markOk` / `markFailed`.
+- `ProcessingProgress` estimates from M4A size + EMA throughput (log-calibrated).
+- STT result → `RecordingStore.markOk` / `markFailed`.
 
 ---
 
@@ -109,7 +118,7 @@ any + STT fail → failed (+ error)
 
 ### UX
 - Defaults: **50** items, **500 MB** total M4A.
-- User changes only under Advanced settings (UI can land later; prefs + prune run now).
+- User changes under **Advanced…** in Settings.
 - Prune after each save: delete oldest by `createdAtMs` until under both caps.
 - Prefer never leaving zero space for the session just saved: prune others first.
 

@@ -98,24 +98,13 @@ class GrokRecognitionService : RecognitionService() {
         scope.launch {
             val store = RecordingStore.fromContext(this@GrokRecognitionService)
             val sessionId =
-                try {
-                    SessionAudio.m4aBytes(clip)?.let { bytes ->
-                        store
-                            .save(
-                                m4aBytes = bytes,
-                                durationMs = clip.durationMs,
-                                status = SessionStatus.PENDING,
-                                language = Prefs.getLanguage(this@GrokRecognitionService),
-                                sampleRate = clip.sampleRate,
-                                sourcePackage = "recognition",
-                                maxItems = Prefs.getHistoryMaxItems(this@GrokRecognitionService),
-                                maxBytes = Prefs.getHistoryMaxBytes(this@GrokRecognitionService),
-                            )?.id
-                    }
-                } catch (e: Exception) {
-                    DiagLog.w("recognition", "history save failed", "err" to e.message)
-                    null
-                }
+                SessionPersistence
+                    .saveClip(
+                        context = this@GrokRecognitionService,
+                        clip = clip,
+                        status = SessionStatus.PENDING,
+                        sourcePackage = "recognition",
+                    )?.id
             try {
                 try {
                     callback.endOfSpeech()
