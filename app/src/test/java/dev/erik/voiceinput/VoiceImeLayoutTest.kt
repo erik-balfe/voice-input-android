@@ -22,6 +22,9 @@ class VoiceImeLayoutTest {
         assertNotNull(view.findViewById(R.id.status))
         assertNotNull(view.findViewById(R.id.open_app))
         assertNotNull(view.findViewById(R.id.retry))
+        assertNotNull(view.findViewById(R.id.pause_resume))
+        assertNotNull(view.findViewById(R.id.process_progress))
+        assertNotNull(view.findViewById(R.id.hint))
     }
 
     @Test

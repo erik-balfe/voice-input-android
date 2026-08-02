@@ -7,6 +7,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.ImageButton
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
@@ -28,9 +29,12 @@ class GrokVoiceInputMethodService : InputMethodService() {
 
     private var statusView: TextView? = null
     private var debugDetail: TextView? = null
+    private var hintView: TextView? = null
     private var voiceCircle: VoiceLevelCircleView? = null
     private var retryButton: ImageButton? = null
+    private var pauseResumeButton: ImageButton? = null
     private var openAppButton: ImageButton? = null
+    private var processProgress: ProgressBar? = null
     private var transcribing = false
     private var transcribeJob: Job? = null
     private var lastFailedClip: PcmClip? = null
@@ -40,8 +44,13 @@ class GrokVoiceInputMethodService : InputMethodService() {
     private var lastRms = 0.0
     private var lastVoice = false
     private var listenStartedAt = 0L
+    /** Accumulated paused wall-time so duration only counts active listening. */
+    private var pausedAccumMs = 0L
+    private var pauseStartedAt = 0L
     private var phaseLine = ""
     private var endingSession = false
+    private var processEstimateMs = 2500L
+    private var processStartedAt = 0L
 
     private val listenTicker =
         object : Runnable {
@@ -49,6 +58,21 @@ class GrokVoiceInputMethodService : InputMethodService() {
                 if (!recorder.isRecording() || transcribing) return
                 updateListenUi()
                 mainHandler.postDelayed(this, 200)
+            }
+        }
+
+    private val processTicker =
+        object : Runnable {
+            override fun run() {
+                if (!transcribing) return
+                val elapsed = System.currentTimeMillis() - processStartedAt
+                val frac = ProcessingProgress.fractionElapsed(elapsed, processEstimateMs)
+                val pct = (frac * 100).toInt().coerceIn(0, 99)
+                processProgress?.progress = (frac * 1000).toInt().coerceIn(0, 920)
+                if (!showDebug) {
+                    setStatus(getString(R.string.ime_processing_pct, pct))
+                }
+                mainHandler.postDelayed(this, 100)
             }
         }
 
@@ -135,11 +159,16 @@ class GrokVoiceInputMethodService : InputMethodService() {
     private fun bindInputView(view: View) {
         statusView = view.findViewById(R.id.status)
         debugDetail = view.findViewById(R.id.debug_detail)
+        hintView = view.findViewById(R.id.hint)
         voiceCircle = view.findViewById(R.id.voice_circle)
         retryButton = view.findViewById(R.id.retry)
+        pauseResumeButton = view.findViewById(R.id.pause_resume)
         openAppButton = view.findViewById(R.id.open_app)
+        processProgress = view.findViewById(R.id.process_progress)
         showDebug = Prefs.isImeDebugOverlay(this)
         debugDetail?.visibility = if (showDebug) View.VISIBLE else View.GONE
+        hideProgress()
+        setHint(R.string.ime_hint_listening)
 
         view.findViewById<ImageButton>(R.id.cancel).setOnClickListener {
             DiagLog.ui("cancel_tap")
@@ -150,6 +179,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
             DiagLog.ui(
                 "stop_tap",
                 "transcribing" to transcribing,
+                "paused" to recorder.isPaused(),
                 "hasFailed" to (lastFailedClip != null),
                 "recording" to recorder.isRecording(),
             )
@@ -158,6 +188,11 @@ class GrokVoiceInputMethodService : InputMethodService() {
                 lastFailedClip != null -> retryTranscription()
                 recorder.isRecording() -> finishAndTranscribe()
             }
+        }
+
+        pauseResumeButton?.setOnClickListener {
+            DiagLog.ui("pause_resume_tap", "paused" to recorder.isPaused())
+            togglePauseResume()
         }
 
         retryButton?.setOnClickListener {
@@ -205,13 +240,19 @@ class GrokVoiceInputMethodService : InputMethodService() {
     private fun startRecording() {
         DiagLog.beginSession("ime")
         transcribeJob?.cancel()
+        mainHandler.removeCallbacks(processTicker)
         transcribing = false
         endingSession = false
         lastFailedClip = null
         lastSessionId = null
         phaseLine = ""
+        pausedAccumMs = 0L
+        pauseStartedAt = 0L
         hideRetry()
+        showPauseControl()
+        hideProgress()
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.RECORDING)
+        setHint(R.string.ime_hint_listening)
         setStatus(getString(R.string.ime_listening))
 
         if (!XaiOauth.hasAnyAuth(this)) {
@@ -223,7 +264,9 @@ class GrokVoiceInputMethodService : InputMethodService() {
         recorder.onLevel = { rms, voice ->
             lastRms = rms
             lastVoice = voice
-            voiceCircle?.setVoiceLevel(AudioLevel.normalizedLevel(rms), voice)
+            if (!recorder.isPaused()) {
+                voiceCircle?.setVoiceLevel(AudioLevel.normalizedLevel(rms), voice)
+            }
         }
 
         if (!recorder.start()) {
@@ -237,23 +280,56 @@ class GrokVoiceInputMethodService : InputMethodService() {
         updateListenUi()
     }
 
+    private fun togglePauseResume() {
+        if (transcribing || !recorder.isRecording() || lastFailedClip != null) return
+        if (recorder.isPaused()) {
+            if (pauseStartedAt > 0L) {
+                pausedAccumMs += System.currentTimeMillis() - pauseStartedAt
+                pauseStartedAt = 0L
+            }
+            recorder.resume()
+            voiceCircle?.setMode(VoiceLevelCircleView.Mode.RECORDING)
+            pauseResumeButton?.setImageResource(R.drawable.ic_ime_pause)
+            pauseResumeButton?.contentDescription = getString(R.string.ime_pause)
+            setHint(R.string.ime_hint_listening)
+        } else {
+            recorder.pause()
+            pauseStartedAt = System.currentTimeMillis()
+            voiceCircle?.setMode(VoiceLevelCircleView.Mode.PAUSED)
+            pauseResumeButton?.setImageResource(R.drawable.ic_ime_play)
+            pauseResumeButton?.contentDescription = getString(R.string.ime_resume)
+            setHint(R.string.ime_hint_paused)
+        }
+        updateListenUi()
+    }
+
+    private fun activeListenMs(): Long {
+        val now = System.currentTimeMillis()
+        val pausedExtra = if (pauseStartedAt > 0L) now - pauseStartedAt else 0L
+        return (now - listenStartedAt - pausedAccumMs - pausedExtra).coerceAtLeast(0L)
+    }
+
     private fun updateListenUi() {
-        val sec = (System.currentTimeMillis() - listenStartedAt) / 1000.0
+        val sec = activeListenMs() / 1000.0
         val mm = (sec.toLong() / 60)
         val ss = (sec.toLong() % 60)
-        setStatus(getString(R.string.ime_listening_duration, mm, ss))
+        if (recorder.isPaused()) {
+            setStatus(getString(R.string.ime_paused_duration, mm, ss))
+        } else {
+            setStatus(getString(R.string.ime_listening_duration, mm, ss))
+        }
         if (!showDebug) return
         val line =
             buildString {
                 append("sid=").append(DiagLog.currentSessionId())
                 append("  t=").append("%.1fs".format(sec))
+                append("  paused=").append(recorder.isPaused())
                 append("  mic=").append(recorder.activeSourceName())
                 append("  sr=").append(recorder.sampleRate())
                 append('\n')
                 append("rms=").append("%.3f".format(lastRms))
                 append("  voice=").append(if (lastVoice) "yes" else "no")
                 append("  peak=").append("%.3f".format(recorder.peakRms()))
-                append("  mode=").append(Prefs.getMicMode(this@GrokVoiceInputMethodService).prefValue)
             }
         debugDetail?.text = line
         DiagLog.setStatus("Listening %.1fs".format(sec), line.replace('\n', ' '))
@@ -382,10 +458,23 @@ class GrokVoiceInputMethodService : InputMethodService() {
         transcribeJob?.cancel()
         transcribing = true
         hideRetry()
+        hidePauseControl()
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.TRANSCRIBING)
-        setStatus(getString(R.string.ime_processing))
+        setHint(R.string.ime_hint_processing)
+        val uploadBytes = clip.encodedUpload?.bytes?.size ?: (clip.pcm.size / 5)
+        processEstimateMs =
+            ProcessingProgress.estimateTotalMs(
+                uploadBytes = uploadBytes,
+                speechDurationMs = clip.durationMs,
+                authLikelyCached = true,
+            )
+        processStartedAt = System.currentTimeMillis()
+        showProgress()
+        setStatus(getString(R.string.ime_processing_pct, 0))
         phaseLine = "Processing…"
         updatePhaseOverlay("Processing…")
+        mainHandler.removeCallbacks(processTicker)
+        mainHandler.post(processTicker)
 
         val wallStart = System.currentTimeMillis()
         val store = RecordingStore.fromContext(this)
@@ -411,10 +500,13 @@ class GrokVoiceInputMethodService : InputMethodService() {
                         "preview" to text.take(80),
                         "sr" to clip.sampleRate,
                         "sessionId" to (sessionId ?: ""),
+                        "estimateMs" to processEstimateMs,
                     )
                     if (sessionId != null) {
                         withContext(Dispatchers.IO) { store.markOk(sessionId, text) }
                     }
+                    mainHandler.removeCallbacks(processTicker)
+                    processProgress?.progress = 1000
                     updatePhaseOverlay("Insert text… total=${totalMs}ms")
                     val connection = currentInputConnection
                     if (connection == null) {
@@ -470,9 +562,12 @@ class GrokVoiceInputMethodService : InputMethodService() {
 
     private fun showTranscribeError(clip: PcmClip, message: String, sessionId: String? = lastSessionId) {
         transcribing = false
+        mainHandler.removeCallbacks(processTicker)
+        hideProgress()
         lastFailedClip = clip
         lastSessionId = sessionId
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.IDLE)
+        setHint(R.string.ime_hint_failed)
         val withHint =
             if (sessionId != null) {
                 "$message\n${getString(R.string.ime_failed_saved_hint)}"
@@ -489,6 +584,9 @@ class GrokVoiceInputMethodService : InputMethodService() {
 
     private fun showIdleError(message: String) {
         mainHandler.removeCallbacks(listenTicker)
+        mainHandler.removeCallbacks(processTicker)
+        hideProgress()
+        hidePauseControl()
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.IDLE)
         setStatus(message)
         if (showDebug) {
@@ -499,15 +597,44 @@ class GrokVoiceInputMethodService : InputMethodService() {
 
     private fun showRetry() {
         retryButton?.visibility = View.VISIBLE
+        pauseResumeButton?.visibility = View.GONE
     }
 
     private fun hideRetry() {
         retryButton?.visibility = View.GONE
+        if (!transcribing) showPauseControl()
+    }
+
+    private fun showPauseControl() {
+        pauseResumeButton?.visibility = View.VISIBLE
+        pauseResumeButton?.setImageResource(R.drawable.ic_ime_pause)
+        pauseResumeButton?.contentDescription = getString(R.string.ime_pause)
+    }
+
+    private fun hidePauseControl() {
+        pauseResumeButton?.visibility = View.GONE
+    }
+
+    private fun showProgress() {
+        processProgress?.visibility = View.VISIBLE
+        processProgress?.progress = 0
+    }
+
+    private fun hideProgress() {
+        processProgress?.visibility = View.GONE
+        processProgress?.progress = 0
+    }
+
+    private fun setHint(resId: Int) {
+        hintView?.setText(resId)
+        hintView?.visibility = View.VISIBLE
     }
 
     private fun returnToKeyboard(cancelJob: Boolean = true) {
         DiagLog.ui("returnToKeyboard", "cancelJob" to cancelJob)
         mainHandler.removeCallbacks(listenTicker)
+        mainHandler.removeCallbacks(processTicker)
+        hideProgress()
         if (cancelJob) {
             transcribing = false
             lastFailedClip = null

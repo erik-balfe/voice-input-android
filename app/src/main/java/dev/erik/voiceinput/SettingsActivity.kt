@@ -89,6 +89,15 @@ class SettingsActivity : ComponentActivity() {
             var micMode by remember { mutableStateOf(Prefs.getMicMode(this)) }
             var imeDebug by remember { mutableStateOf(Prefs.isImeDebugOverlay(this)) }
             var verbose by remember { mutableStateOf(Prefs.isVerboseDiag(this)) }
+            var showAdvanced by remember { mutableStateOf(false) }
+            var historyMaxItems by remember {
+                mutableStateOf(Prefs.getHistoryMaxItems(this).toString())
+            }
+            var historyMaxMb by remember {
+                mutableStateOf(
+                    (Prefs.getHistoryMaxBytes(this) / (1024L * 1024L)).toString(),
+                )
+            }
             var loginStatus by remember { mutableStateOf("") }
             var loginInProgress by remember { mutableStateOf(false) }
             var tokenDetail by remember {
@@ -598,6 +607,79 @@ class SettingsActivity : ComponentActivity() {
                                     text = mode.label,
                                     modifier = Modifier.padding(start = 8.dp),
                                 )
+                            }
+                        }
+
+                        Text(
+                            text = stringResource(R.string.advanced_title),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showAdvanced = !showAdvanced }
+                                    .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.advanced_show),
+                                modifier = Modifier.weight(1f),
+                            )
+                            Switch(
+                                checked = showAdvanced,
+                                onCheckedChange = { showAdvanced = it },
+                            )
+                        }
+                        if (showAdvanced) {
+                            Text(
+                                text = stringResource(R.string.history_limits_title),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                text = stringResource(R.string.history_limits_body),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            OutlinedTextField(
+                                modifier = Modifier.fillMaxWidth(),
+                                value = historyMaxItems,
+                                onValueChange = { historyMaxItems = it.filter { c -> c.isDigit() } },
+                                label = { Text(stringResource(R.string.history_max_items)) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            )
+                            OutlinedTextField(
+                                modifier = Modifier.fillMaxWidth(),
+                                value = historyMaxMb,
+                                onValueChange = { historyMaxMb = it.filter { c -> c.isDigit() } },
+                                label = { Text(stringResource(R.string.history_max_mb)) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            )
+                            Button(
+                                onClick = {
+                                    val items =
+                                        historyMaxItems.toIntOrNull()?.coerceIn(1, 500) ?: 50
+                                    val mb =
+                                        historyMaxMb.toLongOrNull()?.coerceIn(10L, 5000L) ?: 500L
+                                    Prefs.setHistoryMaxItems(this@SettingsActivity, items)
+                                    Prefs.setHistoryMaxBytes(
+                                        this@SettingsActivity,
+                                        mb * 1024L * 1024L,
+                                    )
+                                    historyMaxItems = items.toString()
+                                    historyMaxMb = mb.toString()
+                                    RecordingStore.fromContext(this@SettingsActivity)
+                                        .prune(items, mb * 1024L * 1024L)
+                                    scope.launch {
+                                        snackbar.showSnackbar(
+                                            getString(R.string.history_limits_saved),
+                                        )
+                                    }
+                                },
+                            ) {
+                                Text(stringResource(R.string.history_limits_save))
                             }
                         }
 

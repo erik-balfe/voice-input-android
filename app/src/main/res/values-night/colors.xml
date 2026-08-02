@@ -11,5 +11,9 @@
     <color name="ime_voice_silent">#9AA0A6</color>
     <color name="ime_voice_silent_fill">#BDC1C6</color>
     <color name="ime_voice_ring">#DADCE0</color>
+    <color name="ime_voice_paused">#FDD663</color>
+    <color name="ime_progress_track">#5F6368</color>
+    <color name="ime_progress">#A8C7FA</color>
+    <color name="ime_hint_text">#9AA0A6</color>
     <color name="ime_stop_button_bg">#3C4043</color>
 </resources>

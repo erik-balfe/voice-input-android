@@ -5,13 +5,13 @@ Last updated: 2026-08-03
 ## Where we are
 
 - **STT path works** on device: progressive AAC, OAuth SuperGrok, M4A upload.
-- **Phase 0 + History backbone shipped:**
-  - [FEATURE_DESIGN.md](./FEATURE_DESIGN.md) per-feature UI/UX + arch
-  - `RecordingStore` (M4A + JSON meta, prune 50 / 500 MB defaults)
-  - IME cancel / back / hide → **save keep-worthy** takes (`cancelled_saved`)
-  - Stop → save `pending` → Processing → `ok` / `failed`
-  - `HistoryActivity`: list, copy, retry STT, delete; open from Settings + IME
-  - Duration on listening status; **Processing…** label
+- **History backbone:** RecordingStore, cancel/back save, HistoryActivity.
+- **v0.2.4 UX (this install):**
+  - Pause / resume on IME (mic drain while paused; same progressive encode)
+  - Processing progress bar + % estimate
+  - Meter: waveform bars + paused amber state
+  - Advanced settings: history max items / max MB
+  - Hints under status line
 
 ## Docs
 
@@ -19,17 +19,10 @@ Last updated: 2026-08-03
 - [PLAN.md](./PLAN.md)  
 - [FEATURE_DESIGN.md](./FEATURE_DESIGN.md)  
 
-## Deferred (not in this slice)
+## Still deferred
 
-- Pause/resume mic mid-take  
-- Determinate processing progress bar  
-- Meter visual redesign  
-- FG continue-under-lock  
-- Advanced settings UI for history limits (prefs exist; defaults enforced)
-
-## Next
-
-Phase 2: pause + duration polish; Phase 3 progress estimate; Phase 4 meter.
+- FG continue-under-lock (v1 remains **stop + save** on hide/lock)
+- Byte-accurate upload progress (time-based estimate now)
 
 ## Audio note
 

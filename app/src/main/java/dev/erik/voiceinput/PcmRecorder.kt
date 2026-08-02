@@ -27,6 +27,7 @@ class PcmRecorder(
     private var audioRecord: AudioRecord? = null
     private var thread: Thread? = null
     private val running = AtomicBoolean(false)
+    private val paused = AtomicBoolean(false)
     private val buffer = ByteArrayOutputStream()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val activeSourceName = AtomicReference("?")
@@ -51,6 +52,8 @@ class PcmRecorder(
     fun voiceChunkRatio(): Double = 0.0
 
     fun isRecording(): Boolean = running.get()
+
+    fun isPaused(): Boolean = paused.get()
 
     fun start(): Boolean {
         if (running.get()) return true
@@ -104,6 +107,7 @@ class PcmRecorder(
 
         buffer.reset()
         peakRms.set(0)
+        paused.set(false)
         running.set(true)
         audioRecord = record
         try {
@@ -132,6 +136,13 @@ class PcmRecorder(
                 while (running.get()) {
                     val n = record.read(chunk, 0, chunk.size)
                     if (n > 0) {
+                        if (paused.get()) {
+                            // Drain hardware buffer so resume stays healthy; do not store/encode.
+                            onLevel?.let { cb ->
+                                mainHandler.post { cb(0.0, false) }
+                            }
+                            continue
+                        }
                         synchronized(buffer) {
                             buffer.write(chunk, 0, n)
                         }
@@ -153,6 +164,22 @@ class PcmRecorder(
                 it.name = "PcmRecorder"
                 it.start()
             }
+        return true
+    }
+
+    /** Pause capture (session stays open; progressive encoder holds state). */
+    fun pause(): Boolean {
+        if (!running.get() || paused.get()) return false
+        paused.set(true)
+        DiagLog.i("mic", "pause")
+        return true
+    }
+
+    /** Resume capture into the same progressive session. */
+    fun resume(): Boolean {
+        if (!running.get() || !paused.get()) return false
+        paused.set(false)
+        DiagLog.i("mic", "resume")
         return true
     }
 
@@ -214,6 +241,7 @@ class PcmRecorder(
 
     fun stop(): PcmClip {
         val timing = DiagLog.start("mic", "stop")
+        paused.set(false)
         running.set(false)
         thread?.join(3000)
         thread = null
@@ -265,6 +293,7 @@ class PcmRecorder(
     }
 
     fun cancel() {
+        paused.set(false)
         running.set(false)
         thread?.join(2000)
         thread = null

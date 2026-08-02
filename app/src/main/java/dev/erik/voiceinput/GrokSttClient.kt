@@ -116,6 +116,7 @@ class GrokSttClient(
         val callStart = System.nanoTime()
         http.newCall(request).execute().use { response ->
             val httpMs = (System.nanoTime() - callStart) / 1_000_000L
+            ProcessingProgress.noteUpload(audio.bytes.size, httpMs)
             onPhase?.invoke("Processing…")
             val body = response.body?.string().orEmpty()
             DiagLog.i(

@@ -6,16 +6,18 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import androidx.core.content.ContextCompat
+import kotlin.math.max
 import kotlin.math.sin
 
 /**
- * Center mic affordance:
- * - **Recording**: soft continuous pulse = “listening”; fill + outer rings grow with voice level
- *   (smoothed — no binary blue/gray blink).
- * - **Transcribing**: calm spinning/breathing ring while waiting for the API.
- * - **Idle**: static dim disc.
+ * Center mic affordance with modern level bars:
+ * - **Recording**: soft breath + reactive waveform bars
+ * - **Paused**: frozen amber bars (no live energy)
+ * - **Transcribing**: spinning arc + gentle pulse
+ * - **Idle**: dim disc
  */
 class VoiceLevelCircleView @JvmOverloads constructor(
     context: Context,
@@ -24,6 +26,7 @@ class VoiceLevelCircleView @JvmOverloads constructor(
     enum class Mode {
         IDLE,
         RECORDING,
+        PAUSED,
         TRANSCRIBING,
     }
 
@@ -34,6 +37,11 @@ class VoiceLevelCircleView @JvmOverloads constructor(
             strokeWidth = dp(3.5f)
             strokeCap = Paint.Cap.ROUND
         }
+    private val barPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+        }
     private val wavePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -41,12 +49,12 @@ class VoiceLevelCircleView @JvmOverloads constructor(
         }
 
     private var mode = Mode.IDLE
-    /** Smoothed 0..1 loudness for drawing. */
     private var displayLevel = 0f
-    /** Latest raw target from mic. */
     private var targetLevel = 0f
     private var breath = 0f
     private var spin = 0f
+    private var barPhase = 0f
+    private val barLevels = FloatArray(BAR_COUNT) { 0.15f }
     private var breathAnimator: ValueAnimator? = null
     private var spinAnimator: ValueAnimator? = null
     private var levelAnimator: ValueAnimator? = null
@@ -58,6 +66,7 @@ class VoiceLevelCircleView @JvmOverloads constructor(
     private val colorSilent get() = ContextCompat.getColor(context, R.color.ime_voice_silent)
     private val colorSilentFill get() = ContextCompat.getColor(context, R.color.ime_voice_silent_fill)
     private val colorRing get() = ContextCompat.getColor(context, R.color.ime_voice_ring)
+    private val colorPaused get() = ContextCompat.getColor(context, R.color.ime_voice_paused)
 
     init {
         isClickable = false
@@ -72,12 +81,19 @@ class VoiceLevelCircleView @JvmOverloads constructor(
                 stopSpin()
                 targetLevel = 0f
                 displayLevel = 0f
-                startBreath(periodMs = 1600)
+                startBreath(periodMs = 1400)
                 startLevelSmoothing()
+            }
+            Mode.PAUSED -> {
+                stopSpin()
+                stopLevelSmoothing()
+                targetLevel = 0f
+                displayLevel = 0.2f
+                startBreath(periodMs = 2200)
             }
             Mode.TRANSCRIBING -> {
                 stopLevelSmoothing()
-                startBreath(periodMs = 1100)
+                startBreath(periodMs = 1000)
                 startSpin()
             }
             Mode.IDLE -> {
@@ -91,14 +107,8 @@ class VoiceLevelCircleView @JvmOverloads constructor(
         invalidate()
     }
 
-    /**
-     * @param normalized loudness 0..1 (already roughly scaled)
-     * @param voiceDetected unused for hard switch — level alone drives look
-     */
     fun setVoiceLevel(normalized: Float, voiceDetected: Boolean) {
-        // Ignore binary flag for color; map loudness continuously.
-        // Boost a bit so normal speech is clearly visible, clamp for peaks.
-        targetLevel = (normalized * 1.35f).coerceIn(0f, 1f)
+        targetLevel = (normalized * 1.4f).coerceIn(0f, 1f)
         if (mode == Mode.RECORDING && levelAnimator == null) {
             startLevelSmoothing()
         }
@@ -110,6 +120,7 @@ class VoiceLevelCircleView @JvmOverloads constructor(
         when (mode) {
             Mode.IDLE -> drawIdle(canvas, cx, cy)
             Mode.RECORDING -> drawRecording(canvas, cx, cy)
+            Mode.PAUSED -> drawPaused(canvas, cx, cy)
             Mode.TRANSCRIBING -> drawTranscribing(canvas, cx, cy)
         }
     }
@@ -125,69 +136,111 @@ class VoiceLevelCircleView @JvmOverloads constructor(
 
     private fun drawRecording(canvas: Canvas, cx: Float, cy: Float) {
         val lvl = displayLevel
-        // Soft breath always — shows “listening” even in silence.
-        val breathAmp = 0.04f + 0.03f * (1f - lvl)
-        val breathScale = 1f + breathAmp * sin(breath * Math.PI.toFloat() * 2f)
+        val breathScale = 1f + (0.035f + 0.025f * (1f - lvl)) * sin(breath * Math.PI.toFloat() * 2f)
 
-        // Blend silent → active colors by level (no hard jump).
-        val silentFill = colorSilentFill
-        val activeFill = colorSoft
-        fillPaint.color = lerpColor(silentFill, activeFill, 0.25f + 0.75f * lvl)
-        fillPaint.alpha = (150 + 90 * lvl).toInt().coerceIn(120, 245)
-
-        val coreR = baseRadius * (0.48f + 0.22f * lvl) * breathScale
+        fillPaint.color = lerpColor(colorSilentFill, colorSoft, 0.2f + 0.8f * lvl)
+        fillPaint.alpha = (155 + 90 * lvl).toInt().coerceIn(130, 250)
+        val coreR = baseRadius * (0.42f + 0.18f * lvl) * breathScale
         canvas.drawCircle(cx, cy, coreR, fillPaint)
 
-        ringPaint.color = lerpColor(colorSilent, colorActive, 0.2f + 0.8f * lvl)
+        ringPaint.color = lerpColor(colorSilent, colorActive, 0.15f + 0.85f * lvl)
         ringPaint.alpha = (180 + 70 * lvl).toInt().coerceIn(160, 255)
-        ringPaint.strokeWidth = dp(3f + 1.5f * lvl)
-        canvas.drawCircle(cx, cy, baseRadius * (0.68f + 0.12f * lvl) * breathScale, ringPaint)
+        ringPaint.strokeWidth = dp(2.8f + 1.8f * lvl)
+        canvas.drawCircle(cx, cy, baseRadius * (0.62f + 0.1f * lvl) * breathScale, ringPaint)
 
-        // Outer voice waves — only when there is energy, soft fade.
-        if (lvl > 0.05f) {
-            val waves = 2
-            for (w in 1..waves) {
-                val t = (lvl * (1.1f - w * 0.15f)).coerceIn(0f, 1f)
-                val waveR =
-                    baseRadius *
-                        (0.78f + 0.18f * t + w * 0.08f + 0.03f * sin(breath * 6.28f + w))
-                wavePaint.color = colorActive
-                wavePaint.alpha = (40 + 100 * t * (1f - w * 0.25f)).toInt().coerceIn(0, 160)
-                wavePaint.strokeWidth = dp(1.5f + t)
-                canvas.drawCircle(cx, cy, waveR, wavePaint)
-            }
+        drawBars(canvas, cx, cy, colorActive, live = true)
+
+        if (lvl > 0.08f) {
+            val t = lvl
+            wavePaint.color = colorActive
+            wavePaint.alpha = (50 + 90 * t).toInt().coerceIn(0, 160)
+            wavePaint.strokeWidth = dp(1.4f + t)
+            canvas.drawCircle(
+                cx,
+                cy,
+                baseRadius * (0.78f + 0.14f * t + 0.02f * sin(breath * 6.28f)),
+                wavePaint,
+            )
         }
+    }
+
+    private fun drawPaused(canvas: Canvas, cx: Float, cy: Float) {
+        val breathScale = 1f + 0.02f * sin(breath * Math.PI.toFloat() * 2f)
+        fillPaint.color = colorPaused
+        fillPaint.alpha = 90
+        canvas.drawCircle(cx, cy, baseRadius * 0.44f * breathScale, fillPaint)
+        ringPaint.color = colorPaused
+        ringPaint.alpha = 220
+        ringPaint.strokeWidth = dp(3f)
+        canvas.drawCircle(cx, cy, baseRadius * 0.66f * breathScale, ringPaint)
+        // Two pause glyphs
+        fillPaint.alpha = 230
+        val w = dp(5f)
+        val h = dp(16f)
+        val gap = dp(5f)
+        canvas.drawRoundRect(cx - gap - w, cy - h / 2, cx - gap, cy + h / 2, dp(2f), dp(2f), fillPaint)
+        canvas.drawRoundRect(cx + gap, cy - h / 2, cx + gap + w, cy + h / 2, dp(2f), dp(2f), fillPaint)
+        drawBars(canvas, cx, cy, colorPaused, live = false)
     }
 
     private fun drawTranscribing(canvas: Canvas, cx: Float, cy: Float) {
         fillPaint.color = colorSoft
         fillPaint.alpha = 190
         val breathScale = 1f + 0.06f * sin(breath * Math.PI.toFloat() * 2f)
-        canvas.drawCircle(cx, cy, baseRadius * 0.50f * breathScale, fillPaint)
+        canvas.drawCircle(cx, cy, baseRadius * 0.48f * breathScale, fillPaint)
 
         ringPaint.color = colorActive
         ringPaint.alpha = 230
         ringPaint.strokeWidth = dp(3.5f)
-        val r = baseRadius * (0.72f + 0.08f * breath)
-        // Arc that slowly rotates — “working”
+        val r = baseRadius * (0.70f + 0.08f * breath)
         canvas.save()
         canvas.rotate(spin * 360f, cx, cy)
-        canvas.drawArc(
-            cx - r,
-            cy - r,
-            cx + r,
-            cy + r,
-            -90f,
-            280f,
-            false,
-            ringPaint,
-        )
+        canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90f, 260f, false, ringPaint)
         canvas.restore()
-
-        wavePaint.color = colorActive
-        wavePaint.alpha = 80
-        canvas.drawCircle(cx, cy, r + dp(6f), wavePaint)
     }
+
+    private fun drawBars(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        color: Int,
+        live: Boolean,
+    ) {
+        val barCount = BAR_COUNT
+        val maxH = baseRadius * 0.55f
+        val minH = baseRadius * 0.12f
+        val totalW = baseRadius * 0.95f
+        val gap = totalW / barCount
+        val stroke = max(dp(2.5f), gap * 0.45f)
+        barPaint.strokeWidth = stroke
+        barPaint.color = color
+        val startX = cx - totalW / 2f + gap / 2f
+        for (i in 0 until barCount) {
+            val target =
+                if (live) {
+                    val jitter =
+                        0.35f +
+                            0.65f *
+                            (
+                                0.55f * displayLevel +
+                                    0.45f *
+                                    absSin(barPhase * 2.2f + i * 0.7f + displayLevel * 1.4f)
+                            )
+                    jitter.coerceIn(0.12f, 1f)
+                } else {
+                    // Frozen gentle pattern when paused
+                    (0.25f + 0.15f * absSin(i * 0.9f)).coerceIn(0.15f, 0.45f)
+                }
+            // Smooth each bar
+            barLevels[i] += (target - barLevels[i]) * if (live) 0.35f else 0.12f
+            val h = minH + maxH * barLevels[i]
+            val x = startX + i * gap
+            barPaint.alpha = (120 + 120 * barLevels[i]).toInt().coerceIn(100, 255)
+            canvas.drawLine(x, cy - h / 2f, x, cy + h / 2f, barPaint)
+        }
+    }
+
+    private fun absSin(x: Float): Float = kotlin.math.abs(sin(x))
 
     private fun startBreath(periodMs: Long) {
         stopBreath()
@@ -199,6 +252,7 @@ class VoiceLevelCircleView @JvmOverloads constructor(
                 interpolator = LinearInterpolator()
                 addUpdateListener {
                     breath = it.animatedValue as Float
+                    barPhase += 0.08f
                     invalidate()
                 }
                 start()
@@ -215,7 +269,7 @@ class VoiceLevelCircleView @JvmOverloads constructor(
         stopSpin()
         spinAnimator =
             ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = 1400
+                duration = 1200
                 repeatMode = ValueAnimator.RESTART
                 repeatCount = ValueAnimator.INFINITE
                 interpolator = LinearInterpolator()
@@ -233,21 +287,17 @@ class VoiceLevelCircleView @JvmOverloads constructor(
         spin = 0f
     }
 
-    /** Smooth targetLevel → displayLevel ~60fps. */
     private fun startLevelSmoothing() {
         stopLevelSmoothing()
         levelAnimator =
             ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = 1000L * 60 // long; we only use the frame callbacks
+                duration = 1000L * 60
                 repeatCount = ValueAnimator.INFINITE
-                interpolator = LinearInterpolator()
+                interpolator = DecelerateInterpolator()
                 addUpdateListener {
-                    // Attack fast, release slower — natural VU-meter feel.
-                    val alpha = if (targetLevel > displayLevel) 0.45f else 0.18f
+                    val alpha = if (targetLevel > displayLevel) 0.5f else 0.16f
                     displayLevel += (targetLevel - displayLevel) * alpha
-                    if (displayLevel < 0.01f && targetLevel < 0.01f) {
-                        displayLevel = 0f
-                    }
+                    if (displayLevel < 0.01f && targetLevel < 0.01f) displayLevel = 0f
                     invalidate()
                 }
                 start()
@@ -284,4 +334,8 @@ class VoiceLevelCircleView @JvmOverloads constructor(
     }
 
     private fun dp(v: Float): Float = v * resources.displayMetrics.density
+
+    companion object {
+        private const val BAR_COUNT = 7
+    }
 }
