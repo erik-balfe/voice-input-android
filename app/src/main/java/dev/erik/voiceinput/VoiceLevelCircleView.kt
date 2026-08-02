@@ -108,7 +108,8 @@ class VoiceLevelCircleView @JvmOverloads constructor(
     }
 
     fun setVoiceLevel(normalized: Float, voiceDetected: Boolean) {
-        targetLevel = (normalized * 1.4f).coerceIn(0f, 1f)
+        // Extra gain so color/size swings hard between silence and speech.
+        targetLevel = (normalized * 1.55f).coerceIn(0f, 1f)
         if (mode == Mode.RECORDING && levelAnimator == null) {
             startLevelSmoothing()
         }
@@ -136,29 +137,30 @@ class VoiceLevelCircleView @JvmOverloads constructor(
 
     private fun drawRecording(canvas: Canvas, cx: Float, cy: Float) {
         val lvl = displayLevel
-        val breathScale = 1f + (0.035f + 0.025f * (1f - lvl)) * sin(breath * Math.PI.toFloat() * 2f)
+        val breathScale = 1f + (0.04f + 0.03f * (1f - lvl)) * sin(breath * Math.PI.toFloat() * 2f)
 
-        fillPaint.color = lerpColor(colorSilentFill, colorSoft, 0.2f + 0.8f * lvl)
-        fillPaint.alpha = (155 + 90 * lvl).toInt().coerceIn(130, 250)
-        val coreR = baseRadius * (0.42f + 0.18f * lvl) * breathScale
+        // Strong silent → active color swing (easy to spot a covered mic).
+        fillPaint.color = lerpColor(colorSilentFill, colorActive, 0.05f + 0.95f * lvl)
+        fillPaint.alpha = (100 + 145 * lvl).toInt().coerceIn(90, 255)
+        val coreR = baseRadius * (0.36f + 0.28f * lvl) * breathScale
         canvas.drawCircle(cx, cy, coreR, fillPaint)
 
-        ringPaint.color = lerpColor(colorSilent, colorActive, 0.15f + 0.85f * lvl)
-        ringPaint.alpha = (180 + 70 * lvl).toInt().coerceIn(160, 255)
-        ringPaint.strokeWidth = dp(2.8f + 1.8f * lvl)
-        canvas.drawCircle(cx, cy, baseRadius * (0.62f + 0.1f * lvl) * breathScale, ringPaint)
+        ringPaint.color = lerpColor(colorSilent, colorActive, 0.05f + 0.95f * lvl)
+        ringPaint.alpha = (140 + 115 * lvl).toInt().coerceIn(120, 255)
+        ringPaint.strokeWidth = dp(2.5f + 2.5f * lvl)
+        canvas.drawCircle(cx, cy, baseRadius * (0.58f + 0.16f * lvl) * breathScale, ringPaint)
 
         drawBars(canvas, cx, cy, colorActive, live = true)
 
-        if (lvl > 0.08f) {
+        if (lvl > 0.05f) {
             val t = lvl
             wavePaint.color = colorActive
-            wavePaint.alpha = (50 + 90 * t).toInt().coerceIn(0, 160)
-            wavePaint.strokeWidth = dp(1.4f + t)
+            wavePaint.alpha = (40 + 140 * t).toInt().coerceIn(0, 200)
+            wavePaint.strokeWidth = dp(1.4f + 1.2f * t)
             canvas.drawCircle(
                 cx,
                 cy,
-                baseRadius * (0.78f + 0.14f * t + 0.02f * sin(breath * 6.28f)),
+                baseRadius * (0.76f + 0.18f * t + 0.02f * sin(breath * 6.28f)),
                 wavePaint,
             )
         }
@@ -295,7 +297,8 @@ class VoiceLevelCircleView @JvmOverloads constructor(
                 repeatCount = ValueAnimator.INFINITE
                 interpolator = DecelerateInterpolator()
                 addUpdateListener {
-                    val alpha = if (targetLevel > displayLevel) 0.5f else 0.16f
+                    // Fast attack so speech pops; slightly slower release for readability.
+                    val alpha = if (targetLevel > displayLevel) 0.62f else 0.22f
                     displayLevel += (targetLevel - displayLevel) * alpha
                     if (displayLevel < 0.01f && targetLevel < 0.01f) displayLevel = 0f
                     invalidate()

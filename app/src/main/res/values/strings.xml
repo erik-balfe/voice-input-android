@@ -41,6 +41,7 @@
     <string name="ime_failed">Processing failed — tap Retry</string>
     <string name="ime_failed_saved_hint">Saved in History — open the app to retry anytime</string>
     <string name="ime_saved_to_history">Recording saved to History</string>
+    <string name="ime_hint_saved_hidden">Saved to History — open ↗ or speak again when ready</string>
     <string name="ime_too_short">Too short — hold a bit longer</string>
     <string name="ime_retry">Retry transcription</string>
     <string name="ime_no_input_connection">Could not insert text — focus the field and tap Retry</string>

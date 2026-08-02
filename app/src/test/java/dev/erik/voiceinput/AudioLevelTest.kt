@@ -1,5 +1,6 @@
 package dev.erik.voiceinput
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,5 +19,18 @@ class AudioLevelTest {
         }
         val loudRms = AudioLevel.rmsPcm16Le(loud, 0, loud.size)
         assertTrue(AudioLevel.isVoice(loudRms))
+    }
+
+    @Test
+    fun normalizedLevelIsSensitiveToQuietSpeechVsSilence() {
+        assertEquals(0f, AudioLevel.normalizedLevel(0.0), 0.001f)
+        assertEquals(0f, AudioLevel.normalizedLevel(5.0), 0.001f)
+        val quietTalk = AudioLevel.normalizedLevel(120.0)
+        val normalTalk = AudioLevel.normalizedLevel(400.0)
+        val nearMicCovered = AudioLevel.normalizedLevel(30.0)
+        assertTrue("quiet speech should move the meter", quietTalk > 0.25f)
+        assertTrue("normal speech higher than quiet", normalTalk > quietTalk)
+        assertTrue("near-silence stays low", nearMicCovered < quietTalk)
+        assertTrue(normalTalk <= 1f)
     }
 }

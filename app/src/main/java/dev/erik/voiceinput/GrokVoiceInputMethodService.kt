@@ -101,11 +101,27 @@ class GrokVoiceInputMethodService : InputMethodService() {
             "transcribing" to transcribing,
             "recording" to recorder.isRecording(),
         )
-        // Back / hide: stop + keep audio (do not discard keep-worthy takes).
+        // Back / hide / swipe: stop + keep audio (do not discard keep-worthy takes).
+        // Do not leave a half-dead UI — next onStartInputView must start a fresh session.
         if (!transcribing && recorder.isRecording() && !endingSession) {
             saveOnlyIfKeepWorthy(notify = true)
         }
+        mainHandler.removeCallbacks(listenTicker)
         super.onFinishInputView(finishingInput)
+    }
+
+    override fun onWindowHidden() {
+        super.onWindowHidden()
+        DiagLog.ui(
+            "windowHidden",
+            "transcribing" to transcribing,
+            "recording" to recorder.isRecording(),
+        )
+        // Some OEMs hide the IME without finishInputView — same keep policy.
+        if (!transcribing && recorder.isRecording() && !endingSession) {
+            saveOnlyIfKeepWorthy(notify = true)
+        }
+        mainHandler.removeCallbacks(listenTicker)
     }
 
     override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
@@ -116,7 +132,12 @@ class GrokVoiceInputMethodService : InputMethodService() {
             "package" to (info?.packageName ?: "?"),
             "inputType" to (info?.inputType ?: 0),
             "actionId" to (info?.imeOptions ?: 0),
+            "recording" to recorder.isRecording(),
+            "transcribing" to transcribing,
         )
+        // Android often reuses the input view: after hide we already stopped the mic, so
+        // we must start a *new* listen session here (not only in onCreateInputView).
+        inputView?.post { ensureFreshListenSession() }
     }
 
     override fun onCreateInputView(): View {
@@ -136,13 +157,33 @@ class GrokVoiceInputMethodService : InputMethodService() {
                     .inflate(R.layout.voice_input_ime, null)
             inputView = view
             bindInputView(view)
-            view.post { startRecordingSafely() }
+            // Actual mic start happens in onStartInputView via ensureFreshListenSession.
             view
         } catch (e: Exception) {
             Log.e(TAG, "onCreateInputView failed", e)
             DiagLog.e("ime", "onCreateInputView failed", e)
             fallbackView(e)
         }
+    }
+
+    /**
+     * After hide/back the view may still be inflated but the mic is stopped.
+     * Always put the user into a clean Listening state when the panel is shown again.
+     */
+    private fun ensureFreshListenSession() {
+        if (transcribing) {
+            DiagLog.i("ime", "ensure session: still processing — leave UI")
+            return
+        }
+        if (recorder.isRecording()) {
+            // Already live (rare race) — keep ticker going.
+            mainHandler.removeCallbacks(listenTicker)
+            mainHandler.post(listenTicker)
+            updateListenUi()
+            return
+        }
+        DiagLog.i("ime", "ensure session: start fresh listen")
+        startRecordingSafely()
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
@@ -380,8 +421,20 @@ class GrokVoiceInputMethodService : InputMethodService() {
         }
         val meta = persistClip(clip, SessionStatus.CANCELLED_SAVED)
         endingSession = false
-        if (meta != null && notify) {
-            Toast.makeText(this, R.string.ime_saved_to_history, Toast.LENGTH_SHORT).show()
+        // Reset UI so a reused input view never shows a frozen clock with a dead mic.
+        lastFailedClip = null
+        lastSessionId = meta?.id
+        voiceCircle?.setMode(VoiceLevelCircleView.Mode.IDLE)
+        hideProgress()
+        hideRetry()
+        setHint(R.string.ime_hint_saved_hidden)
+        if (meta != null) {
+            setStatus(getString(R.string.ime_saved_to_history))
+            if (notify) {
+                Toast.makeText(this, R.string.ime_saved_to_history, Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            setStatus(getString(R.string.ime_listening))
         }
     }
 

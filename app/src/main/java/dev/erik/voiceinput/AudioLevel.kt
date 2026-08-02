@@ -26,13 +26,17 @@ object AudioLevel {
 
     /**
      * Map mean-abs level to 0..1 for the UI meter.
-     * Speech typically sits well below 4000; use a softer curve so quiet talk still moves the ring.
+     * Sensitive so quiet speech and “mic covered” silence are obvious.
+     * Near-silence stays low; normal talk pushes mid-high quickly.
      */
     fun normalizedLevel(rms: Double): Float {
-        if (rms <= 0.0) return 0f
-        // Soft knee: ~500 quiet, ~2000 normal, ~5000 loud
-        val n = (rms / 2200.0).toFloat()
-        return n.coerceIn(0f, 1f)
+        if (rms <= 8.0) return 0f
+        // Speech often sits ~100–800 mean-abs on VOICE_RECOGNITION; use a low knee + sqrt
+        // so small changes (finger over mic → silence) are very visible.
+        val linear = (rms / 900.0).toFloat().coerceIn(0f, 1.6f)
+        // sqrt expands quiet region; clamp after slight gain.
+        val shaped = kotlin.math.sqrt(linear.toDouble()).toFloat() * 1.15f
+        return shaped.coerceIn(0f, 1f)
     }
 
     fun isVoice(rms: Double): Boolean = rms >= VOICE_THRESHOLD

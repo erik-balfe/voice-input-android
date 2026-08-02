@@ -45,6 +45,15 @@ class ImeSessionKeepWiringTest {
             src.contains("recorder.stop()") ||
                 src.contains("saveOnlyIfKeepWorthy"),
         )
+        // Hide/back reuses the input view — must restart listen on show again.
+        assertTrue(
+            "onStartInputView must ensure a fresh listen session",
+            src.contains("ensureFreshListenSession"),
+        )
+        assertTrue(
+            "window hide should also keep audio",
+            src.contains("onWindowHidden"),
+        )
     }
 
     @Test
