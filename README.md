@@ -1,17 +1,19 @@
 # Grok Voice Input (Android)
 
-System-wide voice dictation for Android using [xAI Grok STT](https://docs.x.ai/developers/model-capabilities/audio/speech-to-text). Works anywhere the microphone / voice-input affordance appears (keyboard, browser, apps) by implementing Android’s `RecognitionService`.
+System-wide voice dictation for Android using [xAI Grok STT](https://docs.x.ai/developers/model-capabilities/audio/speech-to-text). Works as a **voice keyboard (IME)** and as Android’s `RecognitionService` (system mic affordance where supported).
 
-Desktop sibling: [voice-input](https://github.com/erik-balfe/voice-input) (COSMIC / Linux).
+Desktop sibling: [cosmic-scribe / voice-input](https://github.com/erik-balfe/voice-input) (COSMIC / Linux).
 
 ## What it does
 
-1. Records speech when the system starts voice input (16 kHz mono PCM).
-2. Trims leading/trailing silence (simple RMS threshold).
-3. Sends WAV to `POST https://api.x.ai/v1/stt`.
-4. Returns the transcript to the focused field.
+1. Records speech when you open the Grok voice keyboard (16 kHz mono capture).
+2. **Encodes AAC/M4A while you speak** (progressive encode → near-zero wait after stop).
+3. Uploads compressed audio to `POST https://api.x.ai/v1/stt`.
+4. Inserts the transcript into the focused field.
 
-STT uses `format=true` (inverse text normalization — spoken numbers become digits/symbols where supported) and your chosen `language` code (e.g. `ru`, `en`).
+STT uses `format=true` (inverse text normalization where supported) and your chosen `language` code (e.g. `ru`, `en`).
+
+Product direction (History, pause, never lose a take): see [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) and [docs/PLAN.md](docs/PLAN.md).
 
 ## Install
 
@@ -22,10 +24,13 @@ Or build locally (see below).
 ## Setup on your phone
 
 1. Install the APK (from Releases or local build).
-2. Open **Grok Voice Input** → save your [xAI API key](https://console.x.ai/) → grant microphone.
-3. **Enable the keyboard** (this is where Whisper-style apps show up):  
+2. Open **Grok Voice Input**:
+   - **Preferred:** **Sign in with xAI** (device-code browser login) — STT uses SuperGrok / Premium+ **subscription quota**.
+   - **Fallback:** paste an [xAI API key](https://console.x.ai/) (pay-per-token credits).
+3. Grant microphone.
+4. **Enable the keyboard**:  
    **Settings → System → Languages & input → On-screen keyboard → Manage keyboards → Grok Voice Input → ON**
-4. Switch to it from the keyboard switcher (🌐/mic), or set **Default voice input method** to Grok Voice Input for the system mic button.
+5. Switch to it from the keyboard switcher (🌐), or set **Default voice input method** to Grok Voice Input for the system mic button.
 
 ## Build
 
@@ -43,9 +48,24 @@ APK: `app/build/outputs/apk/release/app-release.apk`
 
 Install: `adb install -r app/build/outputs/apk/release/app-release.apk`
 
+## Diagnostics
+
+On-device log of UI events, mic path, encode, HTTP latency, and errors (for support).
+
+1. Open **Grok Voice Input** → **Diagnostics**.
+2. Optionally enable **Show live status on keyboard** (off by default).
+3. Optionally enable **verbose** diagnostics if you need a debug WAV of the last take.
+4. Reproduce once → **Share diagnostic log**.
+
+Mic path (**Microphone / audio path**): try **VoIP / communication** if the phone mic is quiet or odd; **Unprocessed** for a raw path.
+
+Logcat tag: `GrokVoiceDiag`.
+
 ## Privacy
 
-Audio is sent to xAI for transcription. The API key is stored locally with `EncryptedSharedPreferences`.
+Audio is sent to xAI for transcription. API keys and OAuth tokens are stored locally with `EncryptedSharedPreferences`. This app keeps **its own** xAI OAuth session (not shared with other apps). Diagnostic logs stay on-device until you share them (they may include timing and short transcript previews, not full secrets).
+
+Compressed M4A is the product audio format. Raw PCM is only used in memory during capture (not kept as a full-quality archive).
 
 ## License
 
