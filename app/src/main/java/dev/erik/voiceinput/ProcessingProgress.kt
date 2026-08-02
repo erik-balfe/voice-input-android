@@ -1,33 +1,32 @@
 package dev.erik.voiceinput
 
+import kotlin.math.exp
+import kotlin.math.pow
+
 /**
- * Optimistic wall-time estimate for post-stop STT (progressive encode already done).
+ * Progress for the processing ring — shows *tendency* of speed, not a hard ETA.
  *
- * Calibrated from device logs (2026-08-03, progressive M4A + OAuth cache hit):
- * | speech | m4a   | wallMs | old estimate |
- * | 230s   | 1.4MB | 3595   | 11311 (too slow) |
- * | 119s   | 722KB | 2331   | 5949 |
- * | 55s    | 340KB | 2321   | 3592 |
- * | 11s    | 66KB  | 1544   | 1348 |
- * | 7s     | 46KB  | 1146   | 1257 |
+ * Design (user feedback):
+ * - Never slam to 100% while work is still running (looks like a bug).
+ * - Reach ~[PRIMARY_CAP] around the predicted wall time, then crawl slowly.
+ * - Slightly conservative estimate so we under-run more often than stick at 99%.
  *
- * Model: fixed overhead + bytes/(optimistic B/s) + small speech term.
- * Prefer finishing near 90–100% for typical good networks, not at 30%.
+ * Logs (progressive M4A): long takes ~2–4 s wall; short ~1–1.5 s.
  */
 object ProcessingProgress {
-    /** Default effective B/s for (upload + server) on a normal mobile network. */
-    const val DEFAULT_EFFECTIVE_BPS = 620_000.0
+    const val DEFAULT_EFFECTIVE_BPS = 520_000.0
+
+    /** Progress at predicted completion time (not 100%). */
+    const val PRIMARY_CAP = 0.88f
+
+    /** Absolute max while still waiting for network/server. */
+    const val HARD_CAP = 0.96f
 
     @Volatile
     private var effectiveBpsEma: Double = DEFAULT_EFFECTIVE_BPS
 
-    /**
-     * Observe a completed HTTP round-trip (upload+server).
-     * [elapsedMs] is full STT HTTP time, not pure upload.
-     */
     fun noteUpload(bytes: Int, elapsedMs: Long) {
         if (bytes <= 0 || elapsedMs < 80L) return
-        // Strip ~350ms fixed server/TLS overhead so EMA tracks throughput, not RTT.
         val netMs = (elapsedMs - 350L).coerceAtLeast(80L)
         val bps = bytes * 1000.0 / netMs
         if (bps < 40_000 || bps > 8_000_000) return
@@ -39,39 +38,54 @@ object ProcessingProgress {
         speechDurationMs: Long,
         authLikelyCached: Boolean = true,
     ): Long {
-        val authMs = if (authLikelyCached) 100L else 350L
-        // Persist + pipeline bookkeeping (from logs ~150–250ms)
-        val bookkeepingMs = 180L
-        val bps = effectiveBpsEma.coerceIn(80_000.0, 3_000_000.0)
-        // HTTP ≈ fixed + payload/bps (matches log curve better than speech-heavy model)
+        val authMs = if (authLikelyCached) 120L else 380L
+        val bookkeepingMs = 200L
+        val bps = effectiveBpsEma.coerceIn(80_000.0, 2_500_000.0)
         val httpMs =
-            (420.0 + uploadBytes / bps * 1000.0)
+            (450.0 + uploadBytes / bps * 1000.0)
                 .toLong()
-                .coerceIn(350L, 45_000L)
-        // Tiny speech term — server work grows slowly once progressive M4A is small.
-        val speechMs = (speechDurationMs / 1000.0 * 6.0).toLong().coerceIn(0L, 2_500L)
-        // Slight optimism factor (0.92) so bar reaches high 90s on typical runs.
+                .coerceIn(400L, 45_000L)
+        val speechMs = (speechDurationMs / 1000.0 * 8.0).toLong().coerceIn(0L, 2_000L)
+        // Mild buffer so primary phase is a bit *longer* than median success (avoids early 100%).
         val raw = authMs + bookkeepingMs + httpMs + speechMs
-        return (raw * 0.92).toLong().coerceIn(900L, 60_000L)
+        return (raw * 1.08).toLong().coerceIn(1_000L, 60_000L)
     }
 
     /**
-     * Smooth ease toward target elapsed fraction.
-     * [display] is previous displayed 0..1; returns new display.
+     * Ideal progress for [elapsedMs] given [estimateTotalMs].
+     *
+     * - 0..estimate: ease-out toward [PRIMARY_CAP] (fast start, slows near prediction)
+     * - past estimate: exponential crawl toward [HARD_CAP], never reaches 1.0
+     */
+    fun idealFraction(elapsedMs: Long, estimateTotalMs: Long): Float {
+        if (estimateTotalMs <= 0L) return 0f
+        val t = elapsedMs.toDouble() / estimateTotalMs.toDouble()
+        return if (t <= 1.0) {
+            // easeOutCubic: 1 - (1-t)^3 — quick early motion, decelerate into PRIMARY_CAP
+            val eased = 1.0 - (1.0 - t).coerceIn(0.0, 1.0).pow(3.0)
+            (PRIMARY_CAP * eased).toFloat()
+        } else {
+            // After prediction: very slow approach to HARD_CAP
+            val over = t - 1.0
+            val crawl = 1.0 - exp(-over * 0.85)
+            (PRIMARY_CAP + (HARD_CAP - PRIMARY_CAP) * crawl).toFloat().coerceAtMost(HARD_CAP)
+        }
+    }
+
+    /**
+     * Smooth displayed value toward ideal (buttery ring, no 1% jerks).
      */
     fun smoothToward(
         display: Float,
         elapsedMs: Long,
         estimateTotalMs: Long,
-        cap: Float = 0.94f,
-        alpha: Float = 0.18f,
+        alpha: Float = 0.14f,
     ): Float {
-        if (estimateTotalMs <= 0L) return display
-        val target = (elapsedMs.toFloat() / estimateTotalMs).coerceIn(0f, cap)
-        // Always move forward; ease in so UI doesn't jump in 1% ticks.
+        val target = idealFraction(elapsedMs, estimateTotalMs)
         val next = display + (target - display) * alpha
-        return next.coerceIn(0f, cap).coerceAtLeast(display)
+        return next.coerceIn(0f, HARD_CAP).coerceAtLeast(display)
     }
 
-    fun complete(display: Float): Float = 1f.coerceAtLeast(display)
+    /** Snap toward full only when work is truly done (short ease on last frames). */
+    fun finish(display: Float): Float = 1f
 }

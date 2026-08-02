@@ -28,7 +28,7 @@ class AudioLevelTest {
         val quietTalk = AudioLevel.normalizedLevel(120.0)
         val normalTalk = AudioLevel.normalizedLevel(400.0)
         val nearMicCovered = AudioLevel.normalizedLevel(30.0)
-        assertTrue("quiet speech should move the meter", quietTalk > 0.25f)
+        assertTrue("quiet speech should move the meter", quietTalk > 0.30f)
         assertTrue("normal speech higher than quiet", normalTalk > quietTalk)
         assertTrue("near-silence stays low", nearMicCovered < quietTalk)
         assertTrue(normalTalk <= 1f)

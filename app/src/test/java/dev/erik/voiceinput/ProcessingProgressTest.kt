@@ -5,53 +5,41 @@ import org.junit.Test
 
 class ProcessingProgressTest {
     @Test
-    fun estimateMatchesDeviceLogScaleOptimistic() {
-        // From logs: 1.4MB / 230s speech → wall ~3.6s; old model was ~11s.
+    fun idealNeverHitsHundredWhileWaiting() {
+        val est = 2000L
+        val atPred = ProcessingProgress.idealFraction(2000, est)
+        assertTrue("at prediction ~PRIMARY_CAP: $atPred", atPred in 0.80f..0.90f)
+        val late = ProcessingProgress.idealFraction(8000, est)
+        assertTrue("long overshoot still under HARD_CAP: $late", late < 0.97f)
+        assertTrue(late > atPred)
+    }
+
+    @Test
+    fun estimateInRealisticBandFromLogs() {
         val longTake =
             ProcessingProgress.estimateTotalMs(
                 uploadBytes = 1_396_847,
                 speechDurationMs = 230_144,
-                authLikelyCached = true,
             )
-        assertTrue("long take estimate should be near real ~3.5s not 11s: $longTake", longTake in 2000L..5500L)
-
-        val mid =
-            ProcessingProgress.estimateTotalMs(
-                uploadBytes = 722_502,
-                speechDurationMs = 118_912,
-            )
-        assertTrue("mid take: $mid", mid in 1500L..4000L)
+        // With 8% buffer, still well under old 11s model
+        assertTrue("long: $longTake", longTake in 2500L..6500L)
 
         val short =
             ProcessingProgress.estimateTotalMs(
                 uploadBytes = 46_213,
                 speechDurationMs = 7_360,
             )
-        assertTrue("short take: $short", short in 900L..2500L)
-
-        // Long estimate should not dwarf wall time by 3× (user saw complete at 30%).
-        assertTrue(longTake < 9000L)
+        assertTrue("short: $short", short in 1000L..2800L)
     }
 
     @Test
-    fun smoothProgressIsMonotonicAndCapped() {
+    fun smoothIsMonotonic() {
         var d = 0f
-        d = ProcessingProgress.smoothToward(d, 500, 3000)
-        val mid = d
-        d = ProcessingProgress.smoothToward(d, 1500, 3000)
-        assertTrue(d >= mid)
-        d = ProcessingProgress.smoothToward(d, 50_000, 3000)
-        assertTrue(d <= 0.94f + 0.001f)
-    }
-
-    @Test
-    fun noteUploadImprovesEma() {
-        ProcessingProgress.noteUpload(1_000_000, 2000)
-        val est =
-            ProcessingProgress.estimateTotalMs(
-                uploadBytes = 500_000,
-                speechDurationMs = 60_000,
-            )
-        assertTrue(est > 0)
+        d = ProcessingProgress.smoothToward(d, 400, 2000)
+        val a = d
+        d = ProcessingProgress.smoothToward(d, 1200, 2000)
+        assertTrue(d >= a)
+        d = ProcessingProgress.smoothToward(d, 10_000, 2000)
+        assertTrue(d <= ProcessingProgress.HARD_CAP + 0.001f)
     }
 }

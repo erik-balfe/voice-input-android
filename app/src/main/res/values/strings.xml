@@ -24,6 +24,9 @@
     <string name="ime_pause">Pause</string>
     <string name="ime_resume">Resume</string>
     <string name="ime_open_history">History</string>
+    <string name="ime_open_settings">Settings</string>
+    <string name="settings_advanced_link">Advanced…</string>
+    <string name="settings_advanced_hide">Hide advanced</string>
     <string name="ime_tip_speak">Speak now</string>
     <string name="ime_hint_listening">Speak now</string>
     <string name="ime_hint_paused">Paused</string>

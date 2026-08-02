@@ -1,8 +1,10 @@
 package dev.erik.voiceinput
 
 import android.view.LayoutInflater
+import android.view.View
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -23,8 +25,12 @@ class VoiceImeLayoutTest {
         assertNotNull(view.findViewById(R.id.open_app))
         assertNotNull(view.findViewById(R.id.retry))
         assertNotNull(view.findViewById(R.id.pause_resume))
-        assertNotNull(view.findViewById(R.id.process_progress))
-        assertNotNull(view.findViewById(R.id.hint))
+        val hint = view.findViewById<View>(R.id.hint)
+        assertNotNull(hint)
+        // Fixed-height hint: INVISIBLE by default so pause tips don't resize panel.
+        assertTrue(
+            hint.visibility == View.INVISIBLE || hint.visibility == View.VISIBLE,
+        )
     }
 
     @Test

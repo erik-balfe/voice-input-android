@@ -76,11 +76,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
                         estimateTotalMs = processEstimateMs,
                     )
                 voiceCircle?.setProgress(progressDisplay)
-                val pct = (progressDisplay * 100).toInt().coerceIn(0, 99)
-                if (!showDebug) {
-                    setStatus(getString(R.string.ime_processing_pct, pct))
-                }
-                // ~60fps-ish for smooth ring
+                // Keep frozen timer — ring alone shows processing (no % text).
                 mainHandler.postDelayed(this, 16)
             }
         }
@@ -218,7 +214,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
         showDebug = Prefs.isImeDebugOverlay(this)
         debugDetail?.visibility = if (showDebug) View.VISIBLE else View.GONE
         hideProgress()
-        hintView?.visibility = View.GONE
+        clearHint()
 
         view.findViewById<ImageButton>(R.id.cancel).setOnClickListener {
             DiagLog.ui("cancel_tap")
@@ -251,8 +247,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
         }
 
         openAppButton?.setOnClickListener {
-            DiagLog.ui("open_app_tap")
-            openHistoryApp()
+            DiagLog.ui("open_settings_tap")
+            openSettingsApp()
         }
 
         statusView?.setOnLongClickListener {
@@ -343,17 +339,15 @@ class GrokVoiceInputMethodService : InputMethodService() {
             voiceCircle?.setMode(VoiceLevelCircleView.Mode.RECORDING)
             pauseResumeButton?.setImageResource(R.drawable.ic_ime_pause)
             pauseResumeButton?.contentDescription = getString(R.string.ime_pause)
-            hintView?.visibility = View.GONE
+            clearHint()
         } else {
             recorder.pause()
             pauseStartedAt = System.currentTimeMillis()
             voiceCircle?.setMode(VoiceLevelCircleView.Mode.PAUSED)
             pauseResumeButton?.setImageResource(R.drawable.ic_ime_play)
             pauseResumeButton?.contentDescription = getString(R.string.ime_resume)
-            // Brief pause label only
-            hintView?.setText(R.string.ime_hint_paused)
-            hintView?.visibility = View.VISIBLE
-            tipHideAt = System.currentTimeMillis() + 1500L
+            // Same reserved hint row — INVISIBLE↔VISIBLE text only, no height jump.
+            showHint(R.string.ime_hint_paused, hideAfterMs = 1600L)
         }
         updateListenUi()
     }
@@ -372,16 +366,30 @@ class GrokVoiceInputMethodService : InputMethodService() {
     }
 
     private fun showTipBriefly() {
-        hintView?.setText(R.string.ime_tip_speak)
+        showHint(R.string.ime_tip_speak, hideAfterMs = 2200L)
+    }
+
+    private fun showHint(resId: Int, hideAfterMs: Long = 0L) {
+        hintView?.setText(resId)
         hintView?.visibility = View.VISIBLE
-        tipHideAt = System.currentTimeMillis() + 2200L
+        tipHideAt = if (hideAfterMs > 0L) System.currentTimeMillis() + hideAfterMs else 0L
+    }
+
+    private fun clearHint() {
+        tipHideAt = 0L
+        hintView?.text = ""
+        // Keep layout slot (invisible, not gone).
+        hintView?.visibility = View.INVISIBLE
     }
 
     private fun maybeHideTip() {
         if (tipHideAt > 0L && System.currentTimeMillis() >= tipHideAt) {
             tipHideAt = 0L
             if (!recorder.isPaused()) {
-                hintView?.visibility = View.GONE
+                clearHint()
+            } else {
+                // Clear pause label after timeout without collapsing layout.
+                clearHint()
             }
         }
     }
@@ -416,12 +424,13 @@ class GrokVoiceInputMethodService : InputMethodService() {
         returnToKeyboard()
     }
 
-    private fun openHistoryApp() {
+    /** Gear opens the app (settings / history) — setup, not every-day path. */
+    private fun openSettingsApp() {
         if (recorder.isRecording() && !transcribing) {
             saveOnlyIfKeepWorthy(notify = true)
         }
         val intent =
-            Intent(this, HistoryActivity::class.java).apply {
+            Intent(this, SettingsActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
         startActivity(intent)
@@ -457,10 +466,9 @@ class GrokVoiceInputMethodService : InputMethodService() {
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.IDLE)
         hideProgress()
         hideRetry()
-        hintView?.setText(R.string.ime_hint_saved_hidden)
-        hintView?.visibility = View.VISIBLE
+        showHint(R.string.ime_hint_saved_hidden, hideAfterMs = 2500L)
         if (meta != null) {
-            setStatus(getString(R.string.ime_saved_to_history))
+            // Keep timer visible; toast carries the save message.
             if (notify) {
                 Toast.makeText(this, R.string.ime_saved_to_history, Toast.LENGTH_SHORT).show()
             }
@@ -543,7 +551,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
         transcribing = true
         hideRetry()
         hidePauseControl()
-        hintView?.visibility = View.GONE
+        clearHint()
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.TRANSCRIBING)
         val uploadBytes = clip.encodedUpload?.bytes?.size ?: (clip.pcm.size / 5)
         processEstimateMs =
@@ -555,7 +563,8 @@ class GrokVoiceInputMethodService : InputMethodService() {
         processStartedAt = System.currentTimeMillis()
         progressDisplay = 0f
         voiceCircle?.resetProgress()
-        setStatus(getString(R.string.ime_processing_pct, 0))
+        // Freeze last duration under the ring — no percentage text.
+        setStatus(formatTimer(clip.durationMs))
         phaseLine = "Processing…"
         updatePhaseOverlay("Processing…")
         mainHandler.removeCallbacks(processTicker)
@@ -626,14 +635,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
     }
 
     private fun updatePhaseOverlay(phase: String) {
-        val userFacing =
-            when {
-                phase.startsWith("Done") || phase.startsWith("Total") ->
-                    getString(R.string.ime_processing)
-                phase.startsWith("Retry") -> phase
-                else -> getString(R.string.ime_processing)
-            }
-        setStatus(userFacing)
+        // Product UI: frozen timer + ring only. Debug overlay can show phase.
         if (!showDebug) return
         val line =
             buildString {
@@ -643,7 +645,6 @@ class GrokVoiceInputMethodService : InputMethodService() {
                 append(DiagLog.lastDetailOnly().ifBlank { DiagLog.lastStatusOnly() })
             }
         debugDetail?.text = line
-        statusView?.text = phase
     }
 
     private fun showTranscribeError(clip: PcmClip, message: String, sessionId: String? = lastSessionId) {
@@ -653,8 +654,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
         lastFailedClip = clip
         lastSessionId = sessionId
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.IDLE)
-        hintView?.setText(R.string.ime_hint_failed)
-        hintView?.visibility = View.VISIBLE
+        showHint(R.string.ime_hint_failed, hideAfterMs = 0L)
         setStatus(message)
         if (showDebug) {
             debugDetail?.text =

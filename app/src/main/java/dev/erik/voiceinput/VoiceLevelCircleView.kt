@@ -153,26 +153,35 @@ class VoiceLevelCircleView @JvmOverloads constructor(
 
     private fun drawRecording(canvas: Canvas, cx: Float, cy: Float) {
         val lvl = displayLevel
-        val breathScale = 1f + 0.045f * sin(breath * Math.PI.toFloat() * 2f)
+        val breathScale = 1f + 0.05f * sin(breath * Math.PI.toFloat() * 2f)
 
-        // Outer soft glow — only when energy present (shows “I hear you”).
-        if (lvl > 0.04f) {
+        // Outer glow — strong travel so “hearing you” is obvious.
+        if (lvl > 0.03f) {
             glowPaint.color = colorActive
-            glowPaint.alpha = (30 + 90 * lvl).toInt().coerceIn(0, 140)
-            canvas.drawCircle(cx, cy, baseRadius * (0.72f + 0.22f * lvl) * breathScale, glowPaint)
+            glowPaint.alpha = (40 + 130 * lvl).toInt().coerceIn(0, 200)
+            canvas.drawCircle(cx, cy, baseRadius * (0.70f + 0.32f * lvl) * breathScale, glowPaint)
+            // Second wider halo at high energy
+            if (lvl > 0.35f) {
+                glowPaint.alpha = (20 + 70 * lvl).toInt()
+                canvas.drawCircle(
+                    cx,
+                    cy,
+                    baseRadius * (0.85f + 0.28f * lvl) * breathScale,
+                    glowPaint,
+                )
+            }
         }
 
-        // Core orb: silent gray → vivid active; size grows with voice.
-        fillPaint.color = lerpColor(colorSilentFill, colorActive, 0.08f + 0.92f * lvl)
-        fillPaint.alpha = (110 + 140 * lvl).toInt().coerceIn(100, 255)
-        val coreR = baseRadius * (0.38f + 0.32f * lvl) * breathScale
+        // Core: quiet = small/dim, speech = large/bright (wide size travel).
+        fillPaint.color = lerpColor(colorSilentFill, colorActive, 0.05f + 0.95f * lvl)
+        fillPaint.alpha = (90 + 165 * lvl).toInt().coerceIn(90, 255)
+        val coreR = baseRadius * (0.30f + 0.48f * lvl) * breathScale
         canvas.drawCircle(cx, cy, coreR, fillPaint)
 
-        // Thin outline
-        ringPaint.color = lerpColor(colorSilent, colorActive, 0.1f + 0.9f * lvl)
-        ringPaint.alpha = (150 + 100 * lvl).toInt().coerceIn(140, 255)
-        ringPaint.strokeWidth = dp(2.2f + 2.2f * lvl)
-        canvas.drawCircle(cx, cy, baseRadius * (0.58f + 0.14f * lvl) * breathScale, ringPaint)
+        ringPaint.color = lerpColor(colorSilent, colorActive, 0.05f + 0.95f * lvl)
+        ringPaint.alpha = (140 + 115 * lvl).toInt().coerceIn(130, 255)
+        ringPaint.strokeWidth = dp(2f + 3f * lvl)
+        canvas.drawCircle(cx, cy, baseRadius * (0.52f + 0.28f * lvl) * breathScale, ringPaint)
     }
 
     private fun drawPaused(canvas: Canvas, cx: Float, cy: Float) {
@@ -268,7 +277,7 @@ class VoiceLevelCircleView @JvmOverloads constructor(
                 repeatCount = ValueAnimator.INFINITE
                 interpolator = DecelerateInterpolator()
                 addUpdateListener {
-                    val alpha = if (targetLevel > displayLevel) 0.65f else 0.2f
+                    val alpha = if (targetLevel > displayLevel) 0.72f else 0.18f
                     displayLevel += (targetLevel - displayLevel) * alpha
                     if (displayLevel < 0.01f && targetLevel < 0.01f) displayLevel = 0f
                     invalidate()

@@ -31,11 +31,9 @@ object AudioLevel {
      */
     fun normalizedLevel(rms: Double): Float {
         if (rms <= 8.0) return 0f
-        // Speech often sits ~100–800 mean-abs on VOICE_RECOGNITION; use a low knee + sqrt
-        // so small changes (finger over mic → silence) are very visible.
-        val linear = (rms / 900.0).toFloat().coerceIn(0f, 1.6f)
-        // sqrt expands quiet region; clamp after slight gain.
-        val shaped = kotlin.math.sqrt(linear.toDouble()).toFloat() * 1.15f
+        // Even hotter: quiet talk fills much of the orb; loud nearly maxes.
+        val linear = (rms / 650.0).toFloat().coerceIn(0f, 2.0f)
+        val shaped = kotlin.math.sqrt(linear.toDouble()).toFloat() * 1.25f
         return shaped.coerceIn(0f, 1f)
     }
 

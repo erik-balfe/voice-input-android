@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Fixed panel height: no GONE/VISIBLE height jumps (hint row always reserved). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/ime_panel_background"
+    android:minHeight="188dp"
     android:orientation="vertical"
     android:paddingTop="10dp"
     android:paddingBottom="14dp">
 
-    <!-- Centered timer only (no “Listening” prose). Tip is temporary. -->
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="8dp"
-        android:minHeight="36dp">
+        android:layout_height="40dp"
+        android:paddingHorizontal="8dp">
 
         <TextView
             android:id="@+id/status"
@@ -21,6 +21,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:gravity="center"
+            android:minWidth="64dp"
             android:text="0:00"
             android:textColor="@color/ime_status_text"
             android:textSize="18sp"
@@ -34,24 +35,24 @@
             android:layout_height="40dp"
             android:layout_gravity="end|center_vertical"
             android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/ime_open_history"
+            android:contentDescription="@string/ime_open_settings"
             android:padding="8dp"
             android:scaleType="centerInside"
-            android:src="@drawable/ic_ime_open_app"
+            android:src="@drawable/ic_ime_settings"
             app:tint="@color/ime_status_text" />
     </FrameLayout>
 
+    <!-- Always takes space (INVISIBLE when empty) so pause/tips never resize the panel. -->
     <TextView
         android:id="@+id/hint"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="18dp"
         android:gravity="center"
         android:paddingHorizontal="20dp"
-        android:paddingBottom="4dp"
         android:text="@string/ime_tip_speak"
         android:textColor="@color/ime_hint_text"
         android:textSize="12sp"
-        android:visibility="gone" />
+        android:visibility="invisible" />
 
     <TextView
         android:id="@+id/debug_detail"
@@ -61,12 +62,11 @@
         android:gravity="center"
         android:lineSpacingExtra="2dp"
         android:paddingHorizontal="12dp"
-        android:paddingBottom="4dp"
         android:textColor="@color/ime_debug_text"
         android:textSize="11sp"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:maxLines="2" />
 
-    <!-- Hidden legacy linear bar (progress is circular on the orb). -->
     <ProgressBar
         android:id="@+id/process_progress"
         style="?android:attr/progressBarStyleHorizontal"
@@ -76,11 +76,10 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="108dp"
         android:gravity="center_vertical"
-        android:minHeight="100dp"
         android:orientation="horizontal"
-        android:paddingTop="4dp">
+        android:paddingTop="2dp">
 
         <FrameLayout
             android:layout_width="0dp"

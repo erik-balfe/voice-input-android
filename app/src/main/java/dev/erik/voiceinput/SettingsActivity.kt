@@ -3,13 +3,11 @@ package dev.erik.voiceinput
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,7 +26,6 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
@@ -52,8 +49,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Product settings: History, auth, language, mic path, test STT, advanced limits, share logs.
- * Debug-only surfaces (OAuth JSON import, token dumps, last.wav share) removed from UI.
+ * Lean settings: auth + language first; History/mic/limits/logs under Advanced.
  */
 class SettingsActivity : ComponentActivity() {
     private val requestMic =
@@ -64,12 +60,6 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DiagLog.init(this)
-        DiagLog.i(
-            "settings",
-            "onCreate",
-            "auth" to XaiOauth.authModeLabel(this),
-            "pref" to Prefs.getAuthPreference(this).prefValue,
-        )
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
@@ -107,8 +97,6 @@ class SettingsActivity : ComponentActivity() {
                 authPref = Prefs.getAuthPreference(this@SettingsActivity)
             }
 
-            fun activeLine(): String = XaiOauth.activeCredentialLabel(this@SettingsActivity)
-
             VoiceInputTheme {
                 Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
                     Column(
@@ -118,25 +106,14 @@ class SettingsActivity : ComponentActivity() {
                                 .padding(padding)
                                 .padding(20.dp)
                                 .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
                             text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.headlineMedium,
                         )
 
-                        Button(
-                            onClick = {
-                                startActivity(
-                                    Intent(this@SettingsActivity, HistoryActivity::class.java),
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(stringResource(R.string.history_open))
-                        }
-
-                        // ── Auth ──────────────────────────────────────
+                        // ── Auth (primary) ────────────────────────────
                         Text(
                             text = stringResource(R.string.auth_title),
                             style = MaterialTheme.typography.titleMedium,
@@ -146,7 +123,7 @@ class SettingsActivity : ComponentActivity() {
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            text = activeLine(),
+                            text = XaiOauth.activeCredentialLabel(this@SettingsActivity),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -185,18 +162,10 @@ class SettingsActivity : ComponentActivity() {
                         }
 
                         if (authPref == AuthPreference.OAUTH) {
-                            Text(
-                                text =
-                                    if (oauthLoggedIn) {
-                                        getString(R.string.oauth_status_in)
-                                    } else {
-                                        getString(R.string.oauth_status_out)
-                                    },
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
                             if (!oauthLoggedIn) {
                                 Button(
                                     enabled = !loginInProgress,
+                                    modifier = Modifier.fillMaxWidth(),
                                     onClick = {
                                         loginInProgress = true
                                         loginStatus = getString(R.string.oauth_busy)
@@ -217,9 +186,6 @@ class SettingsActivity : ComponentActivity() {
                                                         this@SettingsActivity,
                                                         start.verificationUri,
                                                     )
-                                                    snackbar.showSnackbar(
-                                                        getString(R.string.oauth_open_browser),
-                                                    )
                                                     withContext(Dispatchers.IO) {
                                                         XaiOauth.pollDeviceToken(
                                                             this@SettingsActivity,
@@ -228,9 +194,6 @@ class SettingsActivity : ComponentActivity() {
                                                     }
                                                     loginStatus = getString(R.string.oauth_success)
                                                     refreshAuthUi()
-                                                    snackbar.showSnackbar(
-                                                        getString(R.string.oauth_success),
-                                                    )
                                                 } catch (e: Exception) {
                                                     loginStatus =
                                                         getString(
@@ -247,15 +210,11 @@ class SettingsActivity : ComponentActivity() {
                                 }
                             } else {
                                 OutlinedButton(
+                                    modifier = Modifier.fillMaxWidth(),
                                     onClick = {
                                         XaiOauth.logout(this@SettingsActivity)
                                         refreshAuthUi()
                                         loginStatus = ""
-                                        scope.launch {
-                                            snackbar.showSnackbar(
-                                                getString(R.string.oauth_status_out),
-                                            )
-                                        }
                                     },
                                 ) {
                                     Text(stringResource(R.string.oauth_sign_out))
@@ -301,11 +260,6 @@ class SettingsActivity : ComponentActivity() {
                                                 AuthPreference.API_KEY,
                                             )
                                             refreshAuthUi()
-                                            scope.launch {
-                                                snackbar.showSnackbar(
-                                                    getString(R.string.api_key_saved),
-                                                )
-                                            }
                                         }
                                     },
                                 ) {
@@ -316,11 +270,6 @@ class SettingsActivity : ComponentActivity() {
                                         onClick = {
                                             Prefs.clearApiKey(this@SettingsActivity)
                                             refreshAuthUi()
-                                            scope.launch {
-                                                snackbar.showSnackbar(
-                                                    getString(R.string.api_key_cleared),
-                                                )
-                                            }
                                         },
                                     ) {
                                         Text(stringResource(R.string.api_key_clear))
@@ -362,7 +311,7 @@ class SettingsActivity : ComponentActivity() {
                             )
                         }
 
-                        // ── Language ──────────────────────────────────
+                        // ── Language (common) ─────────────────────────
                         OutlinedTextField(
                             modifier = Modifier.fillMaxWidth(),
                             value = language,
@@ -379,60 +328,72 @@ class SettingsActivity : ComponentActivity() {
                                     snackbar.showSnackbar(getString(R.string.settings_saved))
                                 }
                             },
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(stringResource(R.string.save))
                         }
 
-                        // ── Mic ───────────────────────────────────────
-                        Text(
-                            text = stringResource(R.string.audio_title),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        MicMode.entries.forEach { mode ->
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .selectable(
-                                            selected = micMode == mode,
-                                            onClick = { micMode = mode },
-                                            role = Role.RadioButton,
-                                        )
-                                        .padding(vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                RadioButton(
-                                    selected = micMode == mode,
-                                    onClick = { micMode = mode },
+                        // Secondary: History
+                        TextButton(
+                            onClick = {
+                                startActivity(
+                                    Intent(this@SettingsActivity, HistoryActivity::class.java),
                                 )
-                                Text(text = mode.label, modifier = Modifier.padding(start = 8.dp))
-                            }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.history_open))
                         }
 
-                        // ── Advanced ──────────────────────────────────
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { showAdvanced = !showAdvanced }
-                                    .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                        // ── Advanced (collapsed, secondary) ───────────
+                        TextButton(
+                            onClick = { showAdvanced = !showAdvanced },
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                text = stringResource(R.string.advanced_show),
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Switch(
-                                checked = showAdvanced,
-                                onCheckedChange = { showAdvanced = it },
+                                text =
+                                    if (showAdvanced) {
+                                        stringResource(R.string.settings_advanced_hide)
+                                    } else {
+                                        stringResource(R.string.settings_advanced_link)
+                                    },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+
                         if (showAdvanced) {
                             Text(
+                                text = stringResource(R.string.audio_title),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            MicMode.entries.forEach { mode ->
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .selectable(
+                                                selected = micMode == mode,
+                                                onClick = { micMode = mode },
+                                                role = Role.RadioButton,
+                                            )
+                                            .padding(vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    RadioButton(
+                                        selected = micMode == mode,
+                                        onClick = { micMode = mode },
+                                    )
+                                    Text(
+                                        text = mode.label,
+                                        modifier = Modifier.padding(start = 8.dp),
+                                    )
+                                }
+                            }
+
+                            Text(
                                 text = stringResource(R.string.history_limits_body),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodySmall,
                             )
                             OutlinedTextField(
                                 modifier = Modifier.fillMaxWidth(),
@@ -456,7 +417,7 @@ class SettingsActivity : ComponentActivity() {
                                 keyboardOptions =
                                     KeyboardOptions(keyboardType = KeyboardType.Number),
                             )
-                            Button(
+                            OutlinedButton(
                                 onClick = {
                                     val items =
                                         historyMaxItems.toIntOrNull()?.coerceIn(1, 500) ?: 50
@@ -481,10 +442,7 @@ class SettingsActivity : ComponentActivity() {
                                 Text(stringResource(R.string.history_limits_save))
                             }
 
-                            Button(
-                                onClick = { shareDiagnostics() },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
+                            TextButton(onClick = { shareDiagnostics() }) {
                                 Text(stringResource(R.string.diag_share))
                             }
                             TextButton(
@@ -497,16 +455,13 @@ class SettingsActivity : ComponentActivity() {
                             ) {
                                 Text(stringResource(R.string.diag_clear))
                             }
-                        }
 
-                        Text(
-                            text = stringResource(R.string.setup_title),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        Text(
-                            text = stringResource(R.string.setup_body_short),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                            Text(
+                                text = stringResource(R.string.setup_body_short),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
@@ -540,10 +495,8 @@ class SettingsActivity : ComponentActivity() {
                     putExtra(Intent.EXTRA_SUBJECT, getString(R.string.diag_share_subject))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-            DiagLog.i("settings", "share diagnostics", "bytes" to file.length())
             startActivity(Intent.createChooser(send, getString(R.string.diag_share_chooser)))
         } catch (e: Exception) {
-            DiagLog.e("settings", "share failed", e)
             Toast.makeText(
                 this,
                 getString(R.string.diag_share_failed, e.message ?: "error"),
