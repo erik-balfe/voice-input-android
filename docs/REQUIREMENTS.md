@@ -247,3 +247,20 @@ Debug overlay **defaults off**.
 - User never asks “where did my recording go?” after cancel/back.
 - History is the obvious recovery path.
 - IME looks intentional, not a debug prototype.
+
+---
+
+## Future: cancel / restart take (not in 0.3.4)
+
+Today, leaving the IME (back / home / lock) **saves** keep-worthy audio and may auto-transcribe later. That recovers accidental hide, but it is **not** a deliberate “I started wrong — scrap this take and record again” control while the keyboard stays open.
+
+**Need:** an IME control available while listening or paused:
+
+1. **Full discard** — throw away the current take, return to ready `0:00`, no insert, preferably no History junk for pure false starts.
+2. **Cancel with save** (optional variant) — stop capture, keep M4A in History for later STT/copy, stay on keyboard ready for a new take.
+
+Typical cases: accidental orb tap; first sentence was wrong and user wants a clean restart.
+
+**Related future:** **silence cutting (VAD)** before upload — trim dead air rather than discarding the whole take. Cancel/restart remains the right tool when the *content* is wrong, not only the silence.
+
+See [FEATURE_DESIGN.md](./FEATURE_DESIGN.md) **F6**.

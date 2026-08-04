@@ -35,6 +35,18 @@ jobs:
           files: grok-voice-input-*.apk
           generate_release_notes: true
           body: |
-            Install `grok-voice-input-*.apk` on your phone (enable install from unknown sources if needed).
+            Install `grok-voice-input-*.apk` (allow install from unknown sources if needed).
 
-            After install, open **Grok Voice Input** → set API key → enable under **Manage keyboards**.
+            ### Setup
+            1. Open **Grok Voice Input** → **Sign in with xAI** (OAuth) or paste an **API key**.
+            2. Grant microphone.
+            3. System **Settings → Languages & input → On-screen keyboard → Manage keyboards → Grok Voice Input → ON**.
+            4. Switch to it from the keyboard picker.
+
+            ### Highlights
+            - Progressive AAC while you speak (fast ✓ → text)
+            - Multi-take voice keyboard (stay ready after insert by default)
+            - **History** of takes; lock/home mid-take saves meaningful audio and can auto-transcribe
+            - Pause / resume, newline, switch to typing keyboard
+
+            Note: CI APK is release-built; signing uses the debug keystore unless repository signing secrets are configured.

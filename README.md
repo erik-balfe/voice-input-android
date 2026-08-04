@@ -32,7 +32,10 @@ Product notes: [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) · [docs/FEATURE_DES
 | ✓ | Transcribe with Grok and insert |
 | ↵ | New line |
 | ⌨️ | Typing keyboard |
+| History | Open takes (copy / retranscribe / delete); mid-take is saved first if keep-worthy |
 | ⚙ | App settings |
+
+Hide, home, or lock mid-take saves meaningful audio (≥1 s) to History and may auto-transcribe in the background.
 
 ## Build
 

@@ -53,18 +53,18 @@ any + STT fail → failed (+ error)
 ### UX
 | Event | Behavior |
 |-------|----------|
-| Center stop | Finalize → save `pending` → **Processing** → insert text → `ok` or `failed` |
-| ✕ cancel | Finalize → if keep-worthy save `cancelled_saved` → leave IME (no insert) |
-| Back / edge swipe / `onFinishInputView` | Same as cancel if recording and not already processing |
-| Duration &lt; keep min (400 ms) | Discard; no History row |
+| **✓ Done** | Finalize → save `pending` → **Processing** → insert text → `ok` or `failed` |
+| Back / edge swipe / hide / lock | If keep-worthy (≥ **1 s**, not silence heuristic): finalize M4A → `cancelled_saved` → `PendingSttQueue` may auto-STT later; no insert into field |
+| Duration &lt; hide keep min (1 s) | Discard; no History row |
+| Duration &lt; finish min (400 ms) on ✓ | Too short; no STT |
 | Processing in flight | Do not cancel mic (already stopped); allow job to finish if possible; still update History |
 
 ### Architecture
-- Single path: `SessionCoordinator.end(reason)`  
-  - `reason`: `PROCESS` | `SAVE_ONLY` | `DISCARD`  
-- Always prefer `recorder.stop()` (finalize M4A) over `cancel()` when duration may be keep-worthy.
+- End reasons: `PROCESS` \| `SAVE_ONLY` \| `DISCARD` (on IME methods today; optional `SessionCoordinator` later).
+- Prefer `recorder.stop()` (finalize M4A) over `cancel()` when duration may be keep-worthy.
 - `cancel()` only after explicit discard of too-short or failed open.
-- Keep min = `VoicePipeline.MIN_DURATION_MS` (400 ms).
+- Hide/cancel keep min = `SessionAudio.KEEP_HISTORY_MIN_MS` / `PendingSttQueue.MEANINGFUL_MIN_MS` (**1000 ms**).
+- Finish min = `VoicePipeline.MIN_DURATION_MS` (**400 ms**).
 
 ---
 
@@ -72,7 +72,7 @@ any + STT fail → failed (+ error)
 
 ### Layout
 ```
-[ ⌨️ typing IME ]     m:ss      [ ⚙ settings ]
+[ ⌨️ typing IME ]     m:ss      [ History ] [ ⚙ settings ]
                       hint (always reserved height)
 [ ↵ newline ]      ( living orb )      [ ✓ done ]
 ```
@@ -83,9 +83,12 @@ any + STT fail → failed (+ error)
 | **✓** | Finish take → STT + insert (green highlight while take active) |
 | **↵** | Insert `\n` into field (paragraph between takes) |
 | **⌨️** | Switch to typing IME (previous/last/next/picker fallbacks) |
+| **History** | Open History app (save mid-take first if recording) |
 | **⚙** | Open Settings (save take first if recording) |
 | **Timer** | Centered `m:ss` active listen time |
 | **Hints** | Persistent while relevant (pause / transcribe / ready) |
+
+**Not shipped yet:** explicit **Cancel take** / restart — see F6.
 
 ### After success
 - Default **keep IME**: enter **ready** at `0:00` mic off (not auto-record).
@@ -144,8 +147,37 @@ RecordingStore.prune(maxItems, maxBytes)
 
 ---
 
-## Deferred (explicit)
-- Waveform meter redesign  
-- Determinate progress bar estimate  
+## F6 — Cancel take / restart (deferred — next UX)
+
+**Problem (user):** Often start the mic by mistake, or speak a few wrong words, and need a **fresh take** without inserting junk text and without treating hide as the only escape.
+
+### Desired UX
+| Action | Behavior |
+|--------|----------|
+| **Discard & restart** | Drop current audio (no History row, or drop even if ≥1 s). Return IME to **ready** at `0:00`, mic off — user taps orb again to record from scratch. Primary path for “I said the wrong thing.” |
+| **Save for later** (optional long-press / second affordance) | Finalize M4A → History as `cancelled_saved` (or `pending`) **without** STT insert; return to ready. User can open History later to retranscribe. Same recovery idea as hide/lock, but **stays on the keyboard**. |
+| While processing | Prefer no hard cancel of in-flight STT; optional “dismiss UI / keep job” later. |
+
+Placement options (pick at implement time): top-bar ✕, or secondary under orb while listening/paused only (hidden in ready).
+
+### Architecture
+- New end reason or flags: `DISCARD_RESTART` vs `SAVE_ONLY_STAY` vs existing hide `SAVE_ONLY` (leave IME).
+- Reuse `SessionAudio` keep heuristics for “save for later”; discard path uses `recorder.cancel()` / delete temp progressive.
+- Do **not** auto-insert on either cancel path.
+- Related later: **silence cut (VAD)** before upload (leading/trailing trim) — cleaner takes when user does want to keep audio; cancel/restart covers intentional “throw this take away.”
+
+### Out of scope for F6
 - FG continue-under-lock  
-- Advanced settings UI for limits (prefs defaults enforced in code)
+- Editing/trimming mid-waveform UI  
+
+---
+
+## Deferred (explicit)
+- **F6 Cancel take / restart** (discard vs save-for-History)  
+- **Silence cut (VAD)** before upload — pairs with cleaner History + STT  
+- Production launcher logo  
+- Wire Advanced mic mode into `PcmRecorder`  
+- History list refresh while open + delete confirm  
+- Waveform meter redesign  
+- FG continue-under-lock  
+- Opus progressive encode

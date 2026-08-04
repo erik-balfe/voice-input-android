@@ -114,6 +114,18 @@ Based on [REQUIREMENTS.md](./REQUIREMENTS.md). Order optimizes for **foundation 
 
 ---
 
+## Phase 7 — Next UX (post 0.3.4)
+
+| Task | Detail |
+|------|--------|
+| **Cancel / restart take** | IME control: discard → ready, or save-to-History without insert (F6) |
+| **Silence cut (VAD)** | Trim leading/trailing silence before STT upload |
+| Production logo | Replace generic launcher icon |
+| Wire Mic mode | `Prefs.getMicMode` → `PcmRecorder.openRecord` |
+| History polish | Live refresh; delete confirm |
+
+---
+
 ## Suggested sequencing for coding sessions
 
 1. **Now:** Phase 0 (docs + cleanup).  
