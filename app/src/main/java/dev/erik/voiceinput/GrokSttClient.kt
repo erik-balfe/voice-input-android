@@ -9,6 +9,11 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
+object GrokStt {
+    const val MODEL = "grok-voice-transcribe-2.0"
+    const val URL = "https://api.x.ai/v1/stt"
+}
+
 class GrokSttClient(
     private val maxRetries: Int = 3,
     private val initialBackoffMs: Long = 500L,
@@ -101,6 +106,7 @@ class GrokSttClient(
         val multipart =
             MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
+                .addFormDataPart("model", GrokStt.MODEL)
                 .addFormDataPart("format", "true")
                 .addFormDataPart("language", language)
                 .addFormDataPart("file", audio.fileName, fileBody)
@@ -108,7 +114,7 @@ class GrokSttClient(
 
         val request =
             Request.Builder()
-                .url("https://api.x.ai/v1/stt")
+                .url(GrokStt.URL)
                 .header("Authorization", "Bearer $apiKey")
                 .post(multipart)
                 .build()

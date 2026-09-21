@@ -202,13 +202,14 @@ object XaiOauth {
         val multipart =
             MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
+                .addFormDataPart("model", GrokStt.MODEL)
                 .addFormDataPart("format", "true")
                 .addFormDataPart("language", Prefs.getLanguage(context))
                 .addFormDataPart("file", "recording.wav", fileBody)
                 .build()
         val request =
             Request.Builder()
-                .url("https://api.x.ai/v1/stt")
+                .url(GrokStt.URL)
                 .header("Authorization", "Bearer $bearer")
                 .post(multipart)
                 .build()
