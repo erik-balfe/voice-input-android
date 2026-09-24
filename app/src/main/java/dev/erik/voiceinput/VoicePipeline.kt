@@ -6,7 +6,8 @@ import android.content.Context
  * Mic capture → compressed M4A → STT.
  *
  * Product audio is **M4A only**. PCM exists only as a live buffer / rare encode fallback.
- * Prefer progressive M4A from capture; post-stop AAC only if progressive failed.
+ * Prefer progressive M4A from capture when the PCM is sent whole.
+ * A long certain non-speech cut re-encodes the trimmed PCM for the API only.
  * Full WAV is never written on the hot path (verbose diagnostics only).
  */
 object VoicePipeline {
@@ -62,7 +63,8 @@ object VoicePipeline {
             DiagLog.i("pipeline", "pcm_raw", *stats.logFields())
         }
 
-        val upload: GrokSttClient.AudioUpload = resolveUpload(context, clip, onPhase)
+        val resolved = resolveUpload(context, clip, onPhase)
+        val upload = resolved.upload
 
         val language = Prefs.getLanguage(context)
         onPhase?.invoke("Processing…")
@@ -109,65 +111,114 @@ object VoicePipeline {
             "authMs" to authMs,
             "encodeFlushMs" to clip.encodeFlushMs,
             "progressive" to (clip.encodedUpload != null),
+            "trimmedSilence" to resolved.trimmed,
         )
         onPhase?.invoke("Done")
         return text
     }
 
+    private data class ResolvedUpload(
+        val upload: GrokSttClient.AudioUpload,
+        /** True when the API bytes were encoded from trimmed PCM, not the stored take. */
+        val trimmed: Boolean,
+    )
+
     /**
-     * Prefer progressive M4A; else post-stop AAC from PCM; WAV only as last resort
-     * when both AAC paths fail (explicit encode failure, not a silent quality choice).
+     * Prefer progressive M4A when the take is unchanged. A real silence cut encodes
+     * the trimmed PCM instead. Empty PCM (History retry) sends the stored original.
      */
     private fun resolveUpload(
         context: Context,
         clip: PcmClip,
         onPhase: ((String) -> Unit)?,
-    ): GrokSttClient.AudioUpload {
-        val progressive = clip.encodedUpload
-        if (progressive != null && progressive.bytes.isNotEmpty()) {
-            val ratio =
-                if (clip.pcm.isNotEmpty()) {
-                    clip.pcm.size.toDouble() / progressive.bytes.size
-                } else {
-                    0.0
-                }
+    ): ResolvedUpload {
+        val pcm16k = pcmAt16k(clip)
+        val forUpload =
+            if (pcm16k.isNotEmpty() && Prefs.isTrimLongSilence(context)) {
+                AudioPreprocessor.prepareForStt(pcm16k, PcmResampler.TARGET_HZ)
+            } else {
+                pcm16k
+            }
+        // Same instance means "send the original bytes".
+        val trimmed = forUpload !== pcm16k
+
+        if (!trimmed) {
+            val progressive = clip.encodedUpload
+            if (progressive != null && progressive.bytes.isNotEmpty()) {
+                val ratio =
+                    if (clip.pcm.isNotEmpty()) {
+                        clip.pcm.size.toDouble() / progressive.bytes.size
+                    } else {
+                        0.0
+                    }
+                DiagLog.i(
+                    "pipeline",
+                    "use_progressive_m4a",
+                    "pcmBytes" to clip.pcm.size,
+                    "m4aBytes" to progressive.bytes.size,
+                    "ratio" to "%.1fx".format(ratio),
+                    "encodeFlushMs" to clip.encodeFlushMs,
+                )
+                maybeSaveDebugWav(context, clip)
+                return ResolvedUpload(progressive, trimmed = false)
+            }
+        } else {
             DiagLog.i(
                 "pipeline",
-                "use_progressive_m4a",
-                "pcmBytes" to clip.pcm.size,
-                "m4aBytes" to progressive.bytes.size,
-                "ratio" to "%.1fx".format(ratio),
-                "encodeFlushMs" to clip.encodeFlushMs,
+                "trimmed_long_silence",
+                "pcmBytes" to pcm16k.size,
+                "trimmedBytes" to forUpload.size,
+                "savedBytes" to (pcm16k.size - forUpload.size),
             )
-            maybeSaveDebugWav(context, clip)
-            return progressive
         }
 
         onPhase?.invoke("Processing…")
-        val pcm16k =
-            if (clip.sampleRate == PcmResampler.TARGET_HZ) {
-                clip.pcm
-            } else {
-                PcmResampler.to16kMonoLe(clip.pcm, clip.sampleRate)
-            }
-        maybeSaveDebugWav(context, clip, pcm16k)
+        val debugPcm = pcm16k.takeIf { it.isNotEmpty() }
+        maybeSaveDebugWav(context, clip, debugPcm)
 
+        val toEncode = if (forUpload.isNotEmpty()) forUpload else pcm16k
         val encStart = System.nanoTime()
         return try {
-            val aac = AacEncoder.encodePcm16MonoToM4a(pcm16k, PcmResampler.TARGET_HZ)
+            val aac = AacEncoder.encodePcm16MonoToM4a(toEncode, PcmResampler.TARGET_HZ)
             val encMs = (System.nanoTime() - encStart) / 1_000_000L
-            DiagLog.w(
-                "pipeline",
-                "post_stop_aac_fallback",
-                "pcmBytes" to pcm16k.size,
-                "m4aBytes" to aac.bytes.size,
-                "encMs" to encMs,
+            if (trimmed) {
+                DiagLog.i(
+                    "pipeline",
+                    "upload_trimmed_m4a",
+                    "pcmBytes" to toEncode.size,
+                    "m4aBytes" to aac.bytes.size,
+                    "encMs" to encMs,
+                )
+            } else {
+                DiagLog.w(
+                    "pipeline",
+                    "post_stop_aac_fallback",
+                    "pcmBytes" to toEncode.size,
+                    "m4aBytes" to aac.bytes.size,
+                    "encMs" to encMs,
+                )
+            }
+            ResolvedUpload(
+                GrokSttClient.AudioUpload(aac.bytes, aac.fileName, aac.mimeType),
+                trimmed = trimmed,
             )
-            GrokSttClient.AudioUpload(aac.bytes, aac.fileName, aac.mimeType)
         } catch (e: Exception) {
             DiagLog.w("pipeline", "AAC failed — WAV last resort", "err" to e.message)
-            val wav = WavEncoder.encodePcm16Mono(pcm16k, PcmResampler.TARGET_HZ)
-            GrokSttClient.AudioUpload(wav, "recording.wav", "audio/wav")
+            val wav = WavEncoder.encodePcm16Mono(toEncode, PcmResampler.TARGET_HZ)
+            ResolvedUpload(
+                GrokSttClient.AudioUpload(wav, "recording.wav", "audio/wav"),
+                trimmed = trimmed,
+            )
+        }
+    }
+
+    /** Full PCM at 16 kHz, or empty when the clip is M4A-only (History). */
+    private fun pcmAt16k(clip: PcmClip): ByteArray {
+        if (clip.pcm.isEmpty()) return clip.pcm
+        return if (clip.sampleRate == PcmResampler.TARGET_HZ) {
+            clip.pcm
+        } else {
+            PcmResampler.to16kMonoLe(clip.pcm, clip.sampleRate)
         }
     }
 

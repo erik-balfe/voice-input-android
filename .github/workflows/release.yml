@@ -46,6 +46,7 @@ jobs:
             4. Switch to it from the keyboard picker.
 
             ### Highlights
+            - Skip long non-speech pauses before upload; History keeps the full take
             - Progressive AAC while you speak (fast ✓ → text)
             - Multi-take voice keyboard (stay ready after insert by default)
             - **History** of takes; lock/home mid-take saves meaningful audio and can auto-transcribe

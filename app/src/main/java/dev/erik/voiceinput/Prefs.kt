@@ -25,6 +25,7 @@ object Prefs {
     private const val KEY_KEEP_IME_AFTER_STT = "keep_ime_after_stt"
     private const val KEY_DICTATION_MARK_ENABLED = "dictation_mark_enabled"
     private const val KEY_DICTATION_MARK_PHRASE = "dictation_mark_phrase"
+    private const val KEY_TRIM_LONG_SILENCE = "trim_long_silence"
 
     @Volatile
     private var cached: SharedPreferences? = null
@@ -179,6 +180,17 @@ object Prefs {
 
     fun resetDictationMarkPhrase(context: Context) {
         prefs(context).edit().remove(KEY_DICTATION_MARK_PHRASE).apply()
+    }
+
+    /**
+     * Drop long certain non-speech before the STT upload. Default on.
+     * History still stores the full recording either way.
+     */
+    fun isTrimLongSilence(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_TRIM_LONG_SILENCE, true)
+
+    fun setTrimLongSilence(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_TRIM_LONG_SILENCE, enabled).apply()
     }
 
     fun systemLanguage(context: Context): String {

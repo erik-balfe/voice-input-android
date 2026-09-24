@@ -56,7 +56,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Product settings only: account, dictation prefs, history.
- * Advanced (mic path, storage caps, logs) is collapsed and secondary.
+ * Advanced (silence trim, mic path, storage caps, logs) is collapsed and secondary.
  */
 class SettingsActivity : ComponentActivity() {
     private val requestMic =
@@ -99,6 +99,7 @@ class SettingsActivity : ComponentActivity() {
             var probeMessage by remember { mutableStateOf("") }
             var probeRunning by remember { mutableStateOf(false) }
             var showAdvanced by remember { mutableStateOf(false) }
+            var trimLongSilence by remember { mutableStateOf(Prefs.isTrimLongSilence(this)) }
             var micMode by remember { mutableStateOf(Prefs.getMicMode(this)) }
             var historyMaxItems by remember {
                 mutableStateOf(Prefs.getHistoryMaxItems(this).toString())
@@ -545,6 +546,40 @@ class SettingsActivity : ComponentActivity() {
                         }
 
                         if (showAdvanced) {
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            trimLongSilence = !trimLongSilence
+                                            Prefs.setTrimLongSilence(
+                                                this@SettingsActivity,
+                                                trimLongSilence,
+                                            )
+                                        }
+                                        .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                    Text(
+                                        text = stringResource(R.string.settings_trim_silence_title),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.settings_trim_silence_body),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Switch(
+                                    checked = trimLongSilence,
+                                    onCheckedChange = {
+                                        trimLongSilence = it
+                                        Prefs.setTrimLongSilence(this@SettingsActivity, it)
+                                    },
+                                )
+                            }
                             Text(
                                 text = stringResource(R.string.audio_title),
                                 style = MaterialTheme.typography.titleSmall,

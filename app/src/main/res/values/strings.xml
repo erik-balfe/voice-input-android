@@ -124,6 +124,8 @@
     <string name="api_key_section">API key (optional, separate from OAuth)</string>
 
     <!-- Mic / VoIP -->
+    <string name="settings_trim_silence_title">Skip long silences on upload</string>
+    <string name="settings_trim_silence_body">Only long stretches that are clearly not speech. Full recording stays in History.</string>
     <string name="audio_title">Microphone (advanced)</string>
     <string name="audio_body">Only change this if the mic sounds wrong. Default uses the system voice-recognition path (recommended). VoIP/Unprocessed are rare device workarounds.</string>
     <string name="audio_mic_empty_hint">Change this only if recording runs and recognition stays empty.</string>
