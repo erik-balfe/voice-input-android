@@ -35,6 +35,13 @@
     <string name="settings_advanced_hide">Hide advanced</string>
     <string name="settings_keep_ime_title">Stay on voice keyboard after dictation</string>
     <string name="settings_keep_ime_body">After text is inserted, stay ready for another take (paused at 0:00). Use the keyboard icon to return to typing.</string>
+    <string name="settings_dictation_mark_title">Append dictation mark</string>
+    <string name="settings_dictation_mark_body">After each successful insert, add the phrase below after a blank line. Off by default.</string>
+    <string name="settings_dictation_mark_phrase">Dictation mark</string>
+    <string name="settings_dictation_mark_reset">Reset to default</string>
+    <string name="ime_insert_dictation_mark">Insert dictation mark</string>
+    <string name="ime_hint_no_voice">No voice heard — mic may be muted</string>
+    <string name="ime_hint_mic_path">Wrong mic, muted, or headphones unplugged?</string>
     <string name="ime_tip_speak">Center pauses · ✓ sends to Grok</string>
     <string name="ime_hint_listening">Tap center to pause</string>
     <string name="ime_hint_paused">Paused</string>
@@ -119,6 +126,7 @@
     <!-- Mic / VoIP -->
     <string name="audio_title">Microphone (advanced)</string>
     <string name="audio_body">Only change this if the mic sounds wrong. Default uses the system voice-recognition path (recommended). VoIP/Unprocessed are rare device workarounds.</string>
+    <string name="audio_mic_empty_hint">Change this only if recording runs and recognition stays empty.</string>
     <string name="mic_mode_label">Mic mode</string>
     <string name="mic_mode_saved">Mic mode saved</string>
 

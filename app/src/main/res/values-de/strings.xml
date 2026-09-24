@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dictation_mark_title">Diktatvermerk anhängen</string>
+    <string name="settings_dictation_mark_body">Nach jedem erfolgreichen Einfügen den Text unten nach einer Leerzeile anhängen. Standardmäßig aus.</string>
+    <string name="settings_dictation_mark_phrase">Diktatvermerk</string>
+    <string name="settings_dictation_mark_reset">Standard wiederherstellen</string>
+    <string name="ime_insert_dictation_mark">Diktatvermerk einfügen</string>
+    <string name="ime_hint_no_voice">Keine Stimme — Mikrofon evtl. stumm</string>
+    <string name="ime_hint_mic_path">Falsches Gerät, stumm oder Kopfhörer getrennt?</string>
+    <string name="audio_mic_empty_hint">Nur ändern, wenn Aufnahme läuft und die Erkennung leer bleibt.</string>
+</resources>

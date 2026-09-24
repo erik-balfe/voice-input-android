@@ -23,6 +23,8 @@ object Prefs {
     private const val KEY_HISTORY_MAX_ITEMS = "history_max_items"
     private const val KEY_HISTORY_MAX_BYTES = "history_max_bytes"
     private const val KEY_KEEP_IME_AFTER_STT = "keep_ime_after_stt"
+    private const val KEY_DICTATION_MARK_ENABLED = "dictation_mark_enabled"
+    private const val KEY_DICTATION_MARK_PHRASE = "dictation_mark_phrase"
 
     @Volatile
     private var cached: SharedPreferences? = null
@@ -151,6 +153,43 @@ object Prefs {
 
     fun setKeepImeAfterStt(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_KEEP_IME_AFTER_STT, enabled).apply()
+    }
+
+    /** Auto-append the dictation mark after each successful insert. Default off. */
+    fun isDictationMarkEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_DICTATION_MARK_ENABLED, false)
+
+    fun setDictationMarkEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_DICTATION_MARK_ENABLED, enabled).apply()
+    }
+
+    /**
+     * Custom phrase, or the built-in default for the **system** language when unset.
+     * [resetDictationMarkPhrase] restores that default.
+     */
+    fun getDictationMarkPhrase(context: Context): String {
+        val stored = prefs(context).getString(KEY_DICTATION_MARK_PHRASE, null)
+        if (stored != null) return stored
+        return DictationMark.defaultPhrase(systemLanguage(context))
+    }
+
+    fun setDictationMarkPhrase(context: Context, phrase: String) {
+        prefs(context).edit().putString(KEY_DICTATION_MARK_PHRASE, phrase).apply()
+    }
+
+    fun resetDictationMarkPhrase(context: Context) {
+        prefs(context).edit().remove(KEY_DICTATION_MARK_PHRASE).apply()
+    }
+
+    fun systemLanguage(context: Context): String {
+        val locale =
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                context.resources.configuration.locales[0]
+            } else {
+                @Suppress("DEPRECATION")
+                context.resources.configuration.locale
+            }
+        return locale?.language ?: java.util.Locale.getDefault().language
     }
 
     // ── xAI OAuth (encrypted) ─────────────────────────────────

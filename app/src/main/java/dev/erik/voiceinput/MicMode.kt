@@ -37,6 +37,22 @@ enum class MicMode(val prefValue: String, val label: String) {
                 MIC -> MediaRecorder.AudioSource.MIC
             }
 
+        /**
+         * Preferred [MediaRecorder.AudioSource] first, then capture fallbacks so a
+         * device that rejects the chosen path can still open a microphone.
+         */
+        fun sourcePriority(mode: MicMode, unprocessedSupported: Boolean): List<Int> {
+            val preferred = audioSource(mode, unprocessedSupported)
+            val fallbacks =
+                listOf(
+                    MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                    MediaRecorder.AudioSource.MIC,
+                )
+            return listOf(preferred) + fallbacks.filter { it != preferred }
+        }
+
+        fun usesCommunicationAudioMode(mode: MicMode): Boolean = mode == VOIP
+
         fun sourceName(source: Int): String =
             when (source) {
                 MediaRecorder.AudioSource.MIC -> "MIC"

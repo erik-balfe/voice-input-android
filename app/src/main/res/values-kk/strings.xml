@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dictation_mark_title">Диктовка белгісін қосу</string>
+    <string name="settings_dictation_mark_body">Әр сәтті кірістіруден кейін төмендегі сөйлемді бос жолдан кейін қосады. Әдепкі бойынша өшірулі.</string>
+    <string name="settings_dictation_mark_phrase">Диктовка белгісі</string>
+    <string name="settings_dictation_mark_reset">Әдепкіге қайтару</string>
+    <string name="ime_insert_dictation_mark">Диктовка белгісін кірістіру</string>
+    <string name="ime_hint_no_voice">Дауыс естілмейді — микрофон өшірулі болуы мүмкін</string>
+    <string name="ime_hint_mic_path">Басқа құрылғы, дыбыс өшірулі немесе құлаққап қосылмаған?</string>
+    <string name="audio_mic_empty_hint">Жазу жүріп, тану бос қалғанда ғана өзгертіңіз.</string>
+</resources>

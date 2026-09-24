@@ -22,6 +22,7 @@ class VoiceImeLayoutTest {
         assertNotNull(view.findViewById(R.id.done))
         assertNotNull(view.findViewById(R.id.newline))
         assertNotNull(view.findViewById(R.id.switch_keyboard))
+        assertNotNull(view.findViewById(R.id.dictation_mark))
         assertNotNull(view.findViewById(R.id.status))
         assertNotNull(view.findViewById(R.id.open_app))
         assertNotNull(view.findViewById(R.id.open_history))

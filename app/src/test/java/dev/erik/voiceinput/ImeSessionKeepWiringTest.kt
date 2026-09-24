@@ -54,6 +54,18 @@ class ImeSessionKeepWiringTest {
             "window hide should also keep audio",
             src.contains("onWindowHidden"),
         )
+        assertTrue(
+            "dictation mark button inserts even when auto-append is off",
+            src.contains("insertDictationMark"),
+        )
+        assertTrue(
+            "successful insert may auto-append dictation mark",
+            src.contains("isDictationMarkEnabled"),
+        )
+        assertTrue(
+            "local silence hints while listening",
+            src.contains("SilenceHintTracker") && src.contains("ime_hint_no_voice"),
+        )
     }
 
     @Test

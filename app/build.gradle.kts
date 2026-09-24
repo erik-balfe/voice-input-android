@@ -20,8 +20,8 @@ android {
         applicationId = "dev.erik.voiceinput"
         minSdk = 29
         targetSdk = 35
-        versionCode = 27
-        versionName = "0.3.6"
+        versionCode = 28
+        versionName = "0.3.7"
     }
 
     signingConfigs {
@@ -67,6 +67,11 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+    }
+
+    lint {
+        // Locale packs only cover the new dictation-mark and silence-hint copy.
+        disable += "MissingTranslation"
     }
 }
 

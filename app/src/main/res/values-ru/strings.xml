@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dictation_mark_title">Добавлять метку диктовки</string>
+    <string name="settings_dictation_mark_body">После каждой успешной вставки добавлять фразу ниже с пустой строки. По умолчанию выкл.</string>
+    <string name="settings_dictation_mark_phrase">Метка диктовки</string>
+    <string name="settings_dictation_mark_reset">Сбросить на стандартную</string>
+    <string name="ime_insert_dictation_mark">Вставить метку диктовки</string>
+    <string name="ime_hint_no_voice">Голос не слышен — микрофон может быть выключен</string>
+    <string name="ime_hint_mic_path">Другое устройство, микрофон выключен или наушники не подключены?</string>
+    <string name="audio_mic_empty_hint">Меняйте только если запись идёт, а распознавание пустое.</string>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dictation_mark_title">Añadir marca de dictado</string>
+    <string name="settings_dictation_mark_body">Tras cada inserción correcta, añadir la frase de abajo después de una línea en blanco. Desactivado por defecto.</string>
+    <string name="settings_dictation_mark_phrase">Marca de dictado</string>
+    <string name="settings_dictation_mark_reset">Restablecer valor predeterminado</string>
+    <string name="ime_insert_dictation_mark">Insertar marca de dictado</string>
+    <string name="ime_hint_no_voice">No se oye voz — el micrófono puede estar silenciado</string>
+    <string name="ime_hint_mic_path">¿Micrófono equivocado, silenciado o auriculares desconectados?</string>
+    <string name="audio_mic_empty_hint">Cámbielo solo si la grabación funciona y el reconocimiento queda vacío.</string>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dictation_mark_title">Dikte işaretini ekle</string>
+    <string name="settings_dictation_mark_body">Her başarılı eklemeden sonra aşağıdaki ifadeyi boş bir satırın ardından ekler. Varsayılan kapalı.</string>
+    <string name="settings_dictation_mark_phrase">Dikte işareti</string>
+    <string name="settings_dictation_mark_reset">Varsayılana sıfırla</string>
+    <string name="ime_insert_dictation_mark">Dikte işaretini ekle</string>
+    <string name="ime_hint_no_voice">Ses yok — mikrofon kapalı olabilir</string>
+    <string name="ime_hint_mic_path">Yanlış cihaz, ses kapalı veya kulaklık takılı değil?</string>
+    <string name="audio_mic_empty_hint">Yalnızca kayıt çalışıp tanıma boş kalıyorsa değiştirin.</string>
+</resources>

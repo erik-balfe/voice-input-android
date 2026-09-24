@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dictation_mark_title">إلحاق علامة الإملاء</string>
+    <string name="settings_dictation_mark_body">بعد كل إدراج ناجح تُضاف العبارة أدناه بعد سطر فارغ. معطّل افتراضيًا.</string>
+    <string name="settings_dictation_mark_phrase">علامة الإملاء</string>
+    <string name="settings_dictation_mark_reset">استعادة الافتراضي</string>
+    <string name="ime_insert_dictation_mark">إدراج علامة الإملاء</string>
+    <string name="ime_hint_no_voice">لا يُسمع صوت — قد يكون الميكروفون صامتًا</string>
+    <string name="ime_hint_mic_path">جهاز خاطئ أو كاتم للصوت أو سماعات غير متصلة؟</string>
+    <string name="audio_mic_empty_hint">غيّر هذا فقط إذا كان التسجيل يعمل والتعرف يبقى فارغًا.</string>
+</resources>

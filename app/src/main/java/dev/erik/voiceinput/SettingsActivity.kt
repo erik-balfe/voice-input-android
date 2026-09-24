@@ -85,6 +85,12 @@ class SettingsActivity : ComponentActivity() {
             var apiKeyDraft by remember { mutableStateOf("") }
             var language by remember { mutableStateOf(Prefs.getLanguage(this)) }
             var keepIme by remember { mutableStateOf(Prefs.isKeepImeAfterStt(this)) }
+            var dictationMarkEnabled by remember {
+                mutableStateOf(Prefs.isDictationMarkEnabled(this))
+            }
+            var dictationMarkPhrase by remember {
+                mutableStateOf(Prefs.getDictationMarkPhrase(this))
+            }
             var loginStatus by remember { mutableStateOf("") }
             var loginInProgress by remember { mutableStateOf(false) }
             var oauthVerifyUrl by remember { mutableStateOf<String?>(null) }
@@ -456,6 +462,59 @@ class SettingsActivity : ComponentActivity() {
                                 },
                             )
                         }
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        dictationMarkEnabled = !dictationMarkEnabled
+                                        Prefs.setDictationMarkEnabled(
+                                            this@SettingsActivity,
+                                            dictationMarkEnabled,
+                                        )
+                                    }
+                                    .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                Text(
+                                    text = stringResource(R.string.settings_dictation_mark_title),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                Text(
+                                    text = stringResource(R.string.settings_dictation_mark_body),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(
+                                checked = dictationMarkEnabled,
+                                onCheckedChange = {
+                                    dictationMarkEnabled = it
+                                    Prefs.setDictationMarkEnabled(this@SettingsActivity, it)
+                                },
+                            )
+                        }
+                        OutlinedTextField(
+                            modifier = Modifier.fillMaxWidth(),
+                            value = dictationMarkPhrase,
+                            onValueChange = {
+                                dictationMarkPhrase = it
+                                Prefs.setDictationMarkPhrase(this@SettingsActivity, it)
+                            },
+                            label = { Text(stringResource(R.string.settings_dictation_mark_phrase)) },
+                            singleLine = true,
+                        )
+                        TextButton(
+                            onClick = {
+                                Prefs.resetDictationMarkPhrase(this@SettingsActivity)
+                                dictationMarkPhrase =
+                                    Prefs.getDictationMarkPhrase(this@SettingsActivity)
+                            },
+                        ) {
+                            Text(stringResource(R.string.settings_dictation_mark_reset))
+                        }
 
                         TextButton(
                             onClick = {
@@ -522,6 +581,11 @@ class SettingsActivity : ComponentActivity() {
                                     )
                                 }
                             }
+                            Text(
+                                text = stringResource(R.string.audio_mic_empty_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
 
                             Text(
                                 text = stringResource(R.string.history_limits_body),

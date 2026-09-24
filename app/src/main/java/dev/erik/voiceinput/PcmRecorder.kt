@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
@@ -34,6 +35,8 @@ class PcmRecorder(
     private val actualSampleRate = AtomicInteger(16_000)
     private val peakRms = AtomicLong(0)
     private var progressive: ProgressiveAacEncoder? = null
+    private var previousAudioMode: Int? = null
+    private var communicationModeActive = false
 
     var onLevel: ((rms: Double, isVoice: Boolean) -> Unit)? = null
 
@@ -118,6 +121,7 @@ class PcmRecorder(
             progressive = null
             record.release()
             audioRecord = null
+            restoreAudioMode()
             timing.fail(e)
             return false
         }
@@ -186,16 +190,23 @@ class PcmRecorder(
     @SuppressLint("MissingPermission")
     private fun openRecord(sampleRate: Int, minBuf: Int): AudioRecord? {
         if (!hasMicPermission()) return null
-        val sources =
-            intArrayOf(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                MediaRecorder.AudioSource.MIC,
-            )
+        val ctx = context
+        val mode = if (ctx != null) Prefs.getMicMode(ctx) else MicMode.AUTO
+        val sources = MicMode.sourcePriority(mode, unprocessedSupported(ctx))
+        if (MicMode.usesCommunicationAudioMode(mode)) {
+            enterCommunicationMode()
+        }
         for (source in sources) {
             try {
                 val rec = build(source, sampleRate, minBuf)
                 if (rec.state == AudioRecord.STATE_INITIALIZED) {
                     activeSourceName.set(MicMode.sourceName(source))
+                    DiagLog.i(
+                        "mic",
+                        "source chosen",
+                        "pref" to mode.prefValue,
+                        "source" to MicMode.sourceName(source),
+                    )
                     return rec
                 }
                 rec.release()
@@ -209,7 +220,47 @@ class PcmRecorder(
                 )
             }
         }
+        restoreAudioMode()
         return null
+    }
+
+    private fun unprocessedSupported(ctx: Context?): Boolean {
+        if (ctx == null) return false
+        return try {
+            val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            am.getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED) == "1"
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun enterCommunicationMode() {
+        val ctx = context ?: return
+        try {
+            val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (!communicationModeActive) {
+                previousAudioMode = am.mode
+                communicationModeActive = true
+            }
+            am.mode = AudioManager.MODE_IN_COMMUNICATION
+        } catch (e: Exception) {
+            DiagLog.w("mic", "communication mode failed", "err" to e.message)
+        }
+    }
+
+    private fun restoreAudioMode() {
+        if (!communicationModeActive) return
+        val saved = previousAudioMode
+        previousAudioMode = null
+        communicationModeActive = false
+        val ctx = context ?: return
+        if (saved == null) return
+        try {
+            val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            am.mode = saved
+        } catch (e: Exception) {
+            DiagLog.w("mic", "restore audio mode failed", "err" to e.message)
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -271,6 +322,7 @@ class PcmRecorder(
             flushMs = (System.nanoTime() - t0) / 1_000_000L
         }
 
+        restoreAudioMode()
         val clip =
             PcmClip(
                 pcm = pcm,
@@ -300,6 +352,7 @@ class PcmRecorder(
         releaseRecord()
         progressive?.cancel()
         progressive = null
+        restoreAudioMode()
         synchronized(buffer) {
             buffer.reset()
         }

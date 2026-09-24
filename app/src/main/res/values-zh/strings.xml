@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dictation_mark_title">追加口述标记</string>
+    <string name="settings_dictation_mark_body">每次成功插入后，在空行后追加下面的短语。默认关闭。</string>
+    <string name="settings_dictation_mark_phrase">口述标记</string>
+    <string name="settings_dictation_mark_reset">恢复默认</string>
+    <string name="ime_insert_dictation_mark">插入口述标记</string>
+    <string name="ime_hint_no_voice">未听到声音，麦克风可能已静音</string>
+    <string name="ime_hint_mic_path">设备不对、已静音，或耳机未连接？</string>
+    <string name="audio_mic_empty_hint">仅在录音正常但识别一直为空时更改。</string>
+</resources>

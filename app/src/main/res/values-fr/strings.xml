@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dictation_mark_title">Ajouter la mention de dictée</string>
+    <string name="settings_dictation_mark_body">Après chaque insertion réussie, ajouter la phrase ci-dessous après une ligne vide. Désactivé par défaut.</string>
+    <string name="settings_dictation_mark_phrase">Mention de dictée</string>
+    <string name="settings_dictation_mark_reset">Rétablir la valeur par défaut</string>
+    <string name="ime_insert_dictation_mark">Insérer la mention de dictée</string>
+    <string name="ime_hint_no_voice">Aucune voix — micro peut-être coupé</string>
+    <string name="ime_hint_mic_path">Mauvais micro, sourdine, ou casque débranché ?</string>
+    <string name="audio_mic_empty_hint">À changer seulement si l’enregistrement tourne et la reconnaissance reste vide.</string>
+</resources>

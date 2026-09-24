@@ -31,6 +31,7 @@ Product notes: [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) · [docs/FEATURE_DES
 | Center orb | Start / pause / resume |
 | ✓ | Transcribe with Grok and insert |
 | ↵ | New line |
+| ” | Insert dictation mark at the end of the field |
 | ⌨️ | Typing keyboard |
 | History | Open takes (copy / retranscribe / delete); mid-take is saved first if keep-worthy |
 | ⚙ | App settings |

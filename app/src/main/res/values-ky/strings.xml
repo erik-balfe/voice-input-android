@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dictation_mark_title">Диктовка белгисин кошуу</string>
+    <string name="settings_dictation_mark_body">Ар ийгиликтүү киргизүүдөн кийин төмөнкү сүйлөмдү бош саптан кийин кошот. Демейки өчүк.</string>
+    <string name="settings_dictation_mark_phrase">Диктовка белгиси</string>
+    <string name="settings_dictation_mark_reset">Демейкиге кайтаруу</string>
+    <string name="ime_insert_dictation_mark">Диктовка белгисин киргизүү</string>
+    <string name="ime_hint_no_voice">Үн угулбайт — микрофон өчүк болушу мүмкүн</string>
+    <string name="ime_hint_mic_path">Башка түзмөк, микрофон өчүк же кулакап туташкан эмес?</string>
+    <string name="audio_mic_empty_hint">Жазуу жүрүп, таануу бош калганда гана өзгөртүңүз.</string>
+</resources>

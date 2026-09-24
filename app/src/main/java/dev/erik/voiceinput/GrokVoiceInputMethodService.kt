@@ -8,6 +8,8 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
+import android.view.inputmethod.ExtractedTextRequest
+import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageButton
 import android.widget.TextView
@@ -61,12 +63,16 @@ class GrokVoiceInputMethodService : InputMethodService() {
     private var tipHideAt = 0L
     /** Waiting for user to start next take (0:00, mic off). */
     private var readyForNextTake = false
+    private val silenceHints = SilenceHintTracker()
+    private var displayedSilenceKind = SilenceHintTracker.Kind.NONE
+    private var takeHeardVoice = false
 
     private val listenTicker =
         object : Runnable {
             override fun run() {
                 if (!recorder.isRecording() || transcribing) return
                 updateListenUi()
+                maybeShowSilenceHint()
                 maybeHideTip()
                 mainHandler.postDelayed(this, 50)
             }
@@ -236,6 +242,18 @@ class GrokVoiceInputMethodService : InputMethodService() {
             cancelAndReturnToKeyboard()
         }
 
+        view.findViewById<ImageButton>(R.id.dictation_mark)?.setOnClickListener {
+            DiagLog.ui("dictation_mark_tap")
+            insertDictationMark()
+        }
+
+        hintView?.setOnClickListener {
+            if (silenceHints.dismiss()) {
+                displayedSilenceKind = SilenceHintTracker.Kind.NONE
+                restoreContextHint()
+            }
+        }
+
         // Center orb: start / pause / resume (not finish).
         view.findViewById<View>(R.id.orb_button).setOnClickListener {
             DiagLog.ui(
@@ -305,6 +323,58 @@ class GrokVoiceInputMethodService : InputMethodService() {
         connection.commitText("\n", 1)
     }
 
+    /**
+     * Insert the dictation mark at the end of the field after a blank line.
+     * If the IME cannot read the whole field, insert at the cursor.
+     */
+    private fun insertDictationMark() {
+        if (transcribing) return
+        val connection = currentInputConnection ?: return
+        val phrase = Prefs.getDictationMarkPhrase(this)
+        val field = readWholeField(connection)
+        val plan = DictationMark.plan(field, phrase)
+        connection.beginBatchEdit()
+        try {
+            if (plan.moveToEnd && field != null) {
+                val moved = connection.setSelection(field.length, field.length)
+                if (moved) {
+                    connection.commitText(plan.text, 1)
+                    return
+                }
+                val cursorPlan = DictationMark.plan(null, phrase)
+                connection.commitText(cursorPlan.text, 1)
+            } else {
+                connection.commitText(plan.text, 1)
+            }
+        } finally {
+            connection.endBatchEdit()
+        }
+    }
+
+    private fun readWholeField(connection: InputConnection): String? {
+        return try {
+            val extracted =
+                connection.getExtractedText(
+                    ExtractedTextRequest().apply {
+                        hintMaxChars = 100_000
+                        hintMaxLines = 50_000
+                    },
+                    0,
+                )
+            if (extracted?.text != null &&
+                extracted.partialStartOffset < 0 &&
+                extracted.startOffset == 0
+            ) {
+                return extracted.text.toString()
+            }
+            val before = connection.getTextBeforeCursor(100_000, 0) ?: return null
+            val after = connection.getTextAfterCursor(100_000, 0) ?: return null
+            before.toString() + after.toString()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun fallbackView(error: Exception): View {
         val view =
             android.view.LayoutInflater.from(withSystemNightMode())
@@ -340,6 +410,9 @@ class GrokVoiceInputMethodService : InputMethodService() {
         lastSessionId = null
         pausedAccumMs = 0L
         pauseStartedAt = 0L
+        takeHeardVoice = false
+        displayedSilenceKind = SilenceHintTracker.Kind.NONE
+        silenceHints.startTake()
         hideRetry()
         showDoneButton()
         newlineButton?.visibility = View.VISIBLE
@@ -360,6 +433,11 @@ class GrokVoiceInputMethodService : InputMethodService() {
         recorder.onLevel = { rms, voice ->
             lastRms = rms
             lastVoice = voice
+            if (voice) {
+                takeHeardVoice = true
+                silenceHints.onVoice()
+                maybeShowSilenceHint()
+            }
             if (!recorder.isPaused()) {
                 voiceCircle?.setVoiceLevel(AudioLevel.normalizedLevel(rms), voice)
             }
@@ -374,6 +452,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
         updateDoneHighlight(emphasized = true)
         // Keep tip visible while listening so the pause control stays obvious.
         showHint(R.string.ime_hint_listening, hideAfterMs = 0L)
+        maybeShowSilenceHint()
         mainHandler.removeCallbacks(listenTicker)
         mainHandler.post(listenTicker)
         updateListenUi()
@@ -499,16 +578,58 @@ class GrokVoiceInputMethodService : InputMethodService() {
         // Optional timed tips only (auth / one-shots). Listening & paused tips stay up.
         if (tipHideAt > 0L && System.currentTimeMillis() >= tipHideAt) {
             tipHideAt = 0L
-            if (recorder.isRecording() && recorder.isPaused()) {
-                showHint(R.string.ime_hint_tap_done, hideAfterMs = 0L)
-            } else if (recorder.isRecording()) {
-                showHint(R.string.ime_hint_listening, hideAfterMs = 0L)
-            } else if (readyForNextTake) {
-                showHint(R.string.ime_tip_ready, hideAfterMs = 0L)
-            } else {
-                clearHint()
+            restoreContextHint()
+        }
+    }
+
+    private fun maybeShowSilenceHint() {
+        if (transcribing) return
+        val kind =
+            silenceHints.evaluate(
+                activeListenMs = activeListenMs(),
+                listening = recorder.isRecording(),
+                paused = recorder.isPaused(),
+            )
+        if (kind == displayedSilenceKind) return
+        displayedSilenceKind = kind
+        when (kind) {
+            SilenceHintTracker.Kind.WEAK ->
+                showHint(R.string.ime_hint_no_voice, hideAfterMs = 0L)
+            SilenceHintTracker.Kind.STRONG ->
+                showHint(R.string.ime_hint_mic_path, hideAfterMs = 0L)
+            SilenceHintTracker.Kind.NONE -> {
+                if (recorder.isRecording() && !recorder.isPaused()) {
+                    showHint(R.string.ime_hint_listening, hideAfterMs = 0L)
+                }
             }
         }
+    }
+
+    private fun restoreContextHint() {
+        when {
+            displayedSilenceKind == SilenceHintTracker.Kind.WEAK ->
+                showHint(R.string.ime_hint_no_voice, hideAfterMs = 0L)
+            displayedSilenceKind == SilenceHintTracker.Kind.STRONG ->
+                showHint(R.string.ime_hint_mic_path, hideAfterMs = 0L)
+            recorder.isRecording() && recorder.isPaused() ->
+                showHint(R.string.ime_hint_tap_done, hideAfterMs = 0L)
+            recorder.isRecording() ->
+                showHint(R.string.ime_hint_listening, hideAfterMs = 0L)
+            readyForNextTake ->
+                showHint(R.string.ime_tip_ready, hideAfterMs = 0L)
+            lastFailedClip != null ->
+                showHint(R.string.ime_hint_failed, hideAfterMs = 0L)
+            else -> clearHint()
+        }
+    }
+
+    private fun noteTakeFinished(durationMs: Long, recognizedOk: Boolean) {
+        val heard =
+            takeHeardVoice ||
+                silenceHints.heardVoiceThisTake ||
+                AudioLevel.isVoice(recorder.peakRms())
+        if (heard) silenceHints.onVoice()
+        silenceHints.finishTake(durationMs, recognizedOk)
     }
 
     private fun updateListenUi() {
@@ -579,6 +700,7 @@ class GrokVoiceInputMethodService : InputMethodService() {
         mainHandler.removeCallbacks(listenTicker)
         recorder.onLevel = null
         val clip = recorder.stop()
+        noteTakeFinished(clip.durationMs, recognizedOk = false)
         DiagLog.ui(
             "save_only",
             "pcmBytes" to clip.pcm.size,
@@ -632,9 +754,11 @@ class GrokVoiceInputMethodService : InputMethodService() {
             "peakRms" to "%.3f".format(recorder.peakRms()),
         )
         if (!SessionAudio.shouldKeepForFinish(clip)) {
+            noteTakeFinished(clip.durationMs, recognizedOk = false)
             showIdleError(getString(R.string.ime_too_short))
             return
         }
+        noteTakeFinished(clip.durationMs, recognizedOk = false)
         val meta = persistClip(clip, SessionStatus.PENDING)
         lastSessionId = meta?.id
         transcribeClip(clip, sessionId = meta?.id)
@@ -747,9 +871,19 @@ class GrokVoiceInputMethodService : InputMethodService() {
                     }
                     val commitStart = System.nanoTime()
                     // Trailing space so the next take doesn't glue onto the last word.
-                    connection.commitText("$text ", 1)
+                    val toCommit =
+                        if (Prefs.isDictationMarkEnabled(this@GrokVoiceInputMethodService)) {
+                            val phrase =
+                                Prefs.getDictationMarkPhrase(this@GrokVoiceInputMethodService)
+                            "$text " +
+                                DictationMark.suffixAfterBlankLine("$text ", phrase)
+                        } else {
+                            "$text "
+                        }
+                    connection.commitText(toCommit, 1)
                     val commitMs = (System.nanoTime() - commitStart) / 1_000_000L
-                    DiagLog.i("ime", "commitText", "ms" to commitMs, "chars" to text.length)
+                    DiagLog.i("ime", "commitText", "ms" to commitMs, "chars" to toCommit.length)
+                    noteTakeFinished(clip.durationMs, recognizedOk = true)
                     afterSuccessfulInsert()
                 } catch (e: Exception) {
                     Log.e(TAG, "transcription failed", e)
@@ -774,7 +908,14 @@ class GrokVoiceInputMethodService : InputMethodService() {
         lastFailedClip = clip
         lastSessionId = sessionId
         voiceCircle?.setMode(VoiceLevelCircleView.Mode.IDLE)
-        showHint(R.string.ime_hint_failed, hideAfterMs = 0L)
+        val strong =
+            silenceHints.evaluate(0, listening = false, paused = false)
+        if (strong == SilenceHintTracker.Kind.STRONG) {
+            displayedSilenceKind = SilenceHintTracker.Kind.STRONG
+            showHint(R.string.ime_hint_mic_path, hideAfterMs = 0L)
+        } else {
+            showHint(R.string.ime_hint_failed, hideAfterMs = 0L)
+        }
         setStatus(message)
         if (showDebug) {
             debugDetail?.text =
